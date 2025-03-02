@@ -1,0 +1,46 @@
+# Logs
+logs/
+*.log
+*.txt
+
+# Cookies
+cookies/
+*.json
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+
+# Selenium specific
+geckodriver.log
+chromedriver.log 
