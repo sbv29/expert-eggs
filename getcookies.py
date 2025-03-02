@@ -3,38 +3,39 @@ import time
 import signal
 from seleniumbase import sb_cdp
 
-# Define cookie storage location
+# Constants
 COOKIE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies")
-COOKIE_FILE = os.path.join(COOKIE_DIR, "cookies.json")
+COOKIE_FILE = os.path.join(COOKIE_DIR, "cookies.json")  # Path to cookie file
+BROWSER_WAIT_TIME = 30  # Time in seconds to keep the browser open for manual login
 
 # Create a temporary HTML file for the browser to load
 def create_dummy_html():
     """Creates a simple HTML file for the browser to load initially."""
     dummy_html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp_dummy.html")
     
-    html_content = """<!DOCTYPE html>
+    html_content = f"""<!DOCTYPE html>
 <html>
 <head>
     <title>Login Helper</title>
     <style>
-        body {
+        body {{
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             line-height: 1.6;
-        }
-        h1 { color: #333; }
-        .instructions {
+        }}
+        h1 {{ color: #333; }}
+        .instructions {{
             background-color: #f8f9fa;
             border-left: 4px solid #007bff;
             padding: 15px;
             margin: 20px 0;
-        }
-        .highlight {
+        }}
+        .highlight {{
             font-weight: bold;
             color: #d63384;
-        }
+        }}
     </style>
 </head>
 <body>
@@ -47,7 +48,7 @@ def create_dummy_html():
             <li>Log in with your credentials</li>
             <li><span class="highlight">Close this browser window when you're done</span></li>
         </ol>
-        <p>This window will automatically close after 20 seconds</p>
+        <p>This window will automatically close after {BROWSER_WAIT_TIME} seconds</p>
     </div>
 </body>
 </html>
@@ -91,10 +92,10 @@ def get_and_save_cookies():
     else:
         print("⚠️ No existing cookies found. Please log in manually.")
 
-    print("\n⏳ Please navigate to the site you need, log in if needed, then close the browser when done...\n")
+    print(f"\n⏳ Please navigate to the site you need, log in if needed, then close the browser when done (or wait {BROWSER_WAIT_TIME} seconds)...\n")
 
     try:
-        sb.sleep(20)
+        sb.sleep(BROWSER_WAIT_TIME)
 
         try:
             sb.save_cookies(COOKIE_FILE)
