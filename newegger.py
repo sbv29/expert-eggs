@@ -333,7 +333,7 @@ def scrape_newegg(url):
                                     print("👆 Clicking 'SIGN IN' button...")
                                     sign_in_button.click()
                                     
-                                    # Wait for sign-in to complete
+                                    # Wait for signin to complete
                                     print("⏳ Waiting for sign-in to complete...")
                                     sb.sleep(2)
                                     print("✅ Sign-in completed")
