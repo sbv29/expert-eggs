@@ -9,11 +9,89 @@ import sys
 import datetime
 
 # Import configuration settings
-from scraperconfig import COOKIE_FILE, PAGE_LOAD_WAIT, MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH
+from scraperconfig import (
+    COOKIE_FILE, PAGE_LOAD_WAIT, MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH,
+    MIN_REFRESH_COUNT, MAX_REFRESH_COUNT, BESTBUY_ORDERS_PAGE_URL, BESTBUY_PASSWORD
+)
 
 def get_timestamp():
     """Return a formatted timestamp string."""
     return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+def refresh_session(sb):
+    """
+    Refresh the session by navigating to the orders page and signing in if needed.
+    This helps prevent CAPTCHA and session timeouts.
+    
+    Args:
+        sb: The SeleniumBase instance
+    """
+    print("\n" + "=" * 80)
+    print(f"🔄 REFRESHING SESSION to prevent CAPTCHA... ⏰ Time: {get_timestamp()}")
+    print("=" * 80)
+    
+    # Navigate to orders page
+    print(f"📄 Navigating to orders page: {BESTBUY_ORDERS_PAGE_URL}")
+    sb.open(BESTBUY_ORDERS_PAGE_URL)
+    sb.sleep(2)  # Wait for page to load
+    
+    # Check if sign-in form appears - use a more general selector
+    print("🔍 Checking if sign-in form appears...")
+    try:
+        # Try different selectors for the password field
+        password_field = None
+        selectors = [
+            'input[data-automation="sign-in-password"]',
+            'input#password[name="password"]',
+            'input[type="password"]'
+        ]
+        
+        for selector in selectors:
+            try:
+                password_field = sb.find_element(selector, timeout=1)
+                if password_field:
+                    print(f"✅ Found password field with selector: {selector}")
+                    break
+            except:
+                continue
+        
+        if password_field:
+            print("🔑 Sign-in form detected, entering credentials...")
+            password_field.send_keys(BESTBUY_PASSWORD)
+            
+            # Find and click the sign-in button - try different selectors
+            sign_in_button = None
+            button_selectors = [
+                'button[data-automation="sign-in-button"]',
+                'button.signin-form-button_CqjFT',
+                'button:contains("Sign In")',
+                'button[type="submit"]'
+            ]
+            
+            for selector in button_selectors:
+                try:
+                    sign_in_button = sb.find_element(selector, timeout=1)
+                    if sign_in_button:
+                        print(f"✅ Found sign-in button with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            if sign_in_button:
+                print("👆 Clicking 'Sign In' button...")
+                sign_in_button.click()
+                # Wait for sign-in to complete
+                print("⏳ Waiting for sign-in to complete...")
+                sb.sleep(2)
+                print("✅ Sign-in completed")
+            else:
+                print("❌ Sign-in button not found")
+        else:
+            print("ℹ️ No password field found, may already be signed in")
+    except Exception as e:
+        print(f"ℹ️ No sign-in form detected or error: {e}")
+    
+    print("✅ Session refreshed successfully")
 
 def scrape_bestbuy():
     """
@@ -24,9 +102,15 @@ def scrape_bestbuy():
     base_url = "https://www.bestbuy.ca"
     cart_url = "https://www.bestbuy.ca/en-ca/basket"
     
-    # Start a new browser instance
+    # Set up Chrome options to bypass bot detection
+    chrome_options = {
+        "disable_blink_features": "AutomationControlled",
+        "enable_undetected": True,
+    }
+    
+    # Start a new browser instance with undetected mode
     print(f"Opening browser and navigating to {url}")
-    sb = sb_cdp.Chrome()
+    sb = sb_cdp.Chrome(uc=True, undetected=True, chrome_options=chrome_options)
     
     # Load cookies if available
     if os.path.exists(COOKIE_FILE):
@@ -35,6 +119,10 @@ def scrape_bestbuy():
         print("✅ Cookies loaded successfully")
     else:
         print(f"⚠️ Cookie file not found at {COOKIE_FILE}")
+    
+    # Initial session refresh
+    print("🔄 Performing initial session refresh...")
+    refresh_session(sb)
     
     # Navigate to the URL after loading cookies
     print(f"Navigating to {url}")
@@ -66,11 +154,26 @@ def scrape_bestbuy():
     
     # Continuous monitoring loop
     refresh_count = 0
+    # Calculate next refresh count (random between MIN and MAX)
+    next_session_refresh_count = random.randint(MIN_REFRESH_COUNT, MAX_REFRESH_COUNT)
+    print(f"⏰ Session will refresh after {next_session_refresh_count} page refreshes")
+    
     try:
         while True:
             refresh_count += 1
             scan_start_time = get_timestamp()
             print(f"\n===== Refresh #{refresh_count} | Started: {scan_start_time} =====")
+            
+            # Check if we need to refresh the session
+            if refresh_count >= next_session_refresh_count:
+                refresh_session(sb)
+                refresh_count = 0
+                next_session_refresh_count = random.randint(MIN_REFRESH_COUNT, MAX_REFRESH_COUNT)
+                print(f"⏰ Session will refresh after {next_session_refresh_count} page refreshes")
+                # Return to the product page after session refresh
+                print(f"🔄 Returning to product page after session refresh: {url}")
+                sb.open(url)
+                sb.sleep(1)
             
             # Wait for page to load
             print(f"⏳ Waiting {PAGE_LOAD_WAIT} seconds for page to load...")
@@ -268,6 +371,7 @@ def scrape_bestbuy():
             scan_duration = datetime.datetime.strptime(scan_end_time, '%Y-%m-%d %H:%M:%S.%f') - datetime.datetime.strptime(scan_start_time, '%Y-%m-%d %H:%M:%S.%f')
             
             print(f"\n===== Scan completed | Started: {scan_start_time} | Ended: {scan_end_time} | Duration: {scan_duration.total_seconds():.2f} seconds =====")
+            print(f"📊 Refreshes until next CAPTCHA check: {refresh_count}/{next_session_refresh_count}")
             
             # Random refresh interval between MIN_RANDOM_REFRESH and MAX_RANDOM_REFRESH seconds
             refresh_time = random.uniform(MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH)

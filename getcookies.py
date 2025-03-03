@@ -6,7 +6,7 @@ from seleniumbase import sb_cdp
 # Constants
 COOKIE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies")
 COOKIE_FILE = os.path.join(COOKIE_DIR, "cookies.json")  # Path to cookie file
-BROWSER_WAIT_TIME = 30  # Time in seconds to keep the browser open for manual login
+BROWSER_WAIT_TIME = 20  # Time in seconds to keep the browser open for manual login
 
 # Create a temporary HTML file for the browser to load
 def create_dummy_html():
@@ -80,8 +80,14 @@ def get_and_save_cookies():
     
     print("\n🌐 Opening browser...")
 
-    # Start browser session on dummy HTML file
-    sb = sb_cdp.Chrome(dummy_html_url)
+    # Set up Chrome options to bypass bot detection
+    chrome_options = {
+        "disable_blink_features": "AutomationControlled",
+        "enable_undetected": True,
+    }
+
+    # Start browser session on dummy HTML file with undetected mode
+    sb = sb_cdp.Chrome(dummy_html_url, uc=True, undetected=True, chrome_options=chrome_options)
 
     # Load existing cookies if available
     if os.path.exists(COOKIE_FILE):
