@@ -464,6 +464,96 @@ def refresh_session(sb):
     
     print(f"{'=' * 80}")
 
+def check_page_loaded_with_retry(sb, expected_element_selector, max_retries=3, retry_delay=2, description="page load check"):
+    """
+    Check if a page is fully loaded by looking for an expected element.
+    Retry with increasing delays if the element is not found.
+    
+    Args:
+        sb: SeleniumBase instance
+        expected_element_selector: CSS selector for an element that should be present when page is loaded
+        max_retries: Maximum number of retries
+        retry_delay: Initial delay between retries in seconds
+        description: Description for logging
+        
+    Returns:
+        True if the page loaded successfully, False otherwise
+    """
+    print(f"🔍 Checking if page is fully loaded (looking for {expected_element_selector})...")
+    
+    for attempt in range(max_retries + 1):
+        try:
+            # Try to find the expected element
+            element = sb.find_element(expected_element_selector, timeout=3)
+            if element:
+                if attempt > 0:
+                    print(f"✅ Page fully loaded on retry attempt {attempt}")
+                else:
+                    print("✅ Page loaded successfully")
+                return True
+        except Exception:
+            if attempt < max_retries:
+                # Calculate delay with increasing backoff
+                current_delay = retry_delay * (attempt + 1)
+                print(f"⚠️ Page not fully loaded yet. Waiting {current_delay} seconds before retry {attempt + 1}/{max_retries}...")
+                sb.sleep(current_delay)
+            else:
+                print(f"❌ Page failed to load completely after {max_retries} retries")
+                # Try to refresh the page as a last resort
+                print("🔄 Attempting to refresh the page...")
+                try:
+                    sb.refresh()
+                    sb.sleep(3)
+                    # One final check after refresh
+                    try:
+                        if sb.find_element(expected_element_selector, timeout=3):
+                            print("✅ Page loaded successfully after refresh")
+                            return True
+                    except:
+                        pass
+                except:
+                    pass
+                return False
+    
+    return False
+
+def open_url_with_retry(sb, url, description="page load", max_retries=3, retry_delay=2):
+    """
+    Open a URL with retry logic in case of failure.
+    
+    Args:
+        sb: SeleniumBase instance
+        url: URL to open
+        description: Description for logging
+        max_retries: Maximum number of retries
+        retry_delay: Initial delay between retries in seconds
+        
+    Returns:
+        True if the URL was opened successfully, False otherwise
+    """
+    print(f"🌐 Opening URL for {description}: {url}")
+    
+    for attempt in range(max_retries + 1):
+        try:
+            # Try to open the URL
+            sb.open(url)
+            if attempt > 0:
+                print(f"✅ URL opened successfully on retry attempt {attempt}")
+            else:
+                print("✅ URL opened successfully")
+            return True
+        except Exception as e:
+            if attempt < max_retries:
+                # Calculate delay with increasing backoff
+                current_delay = retry_delay * (attempt + 1)
+                print(f"⚠️ Failed to open URL: {e}. Waiting {current_delay} seconds before retry {attempt + 1}/{max_retries}...")
+                time.sleep(current_delay)
+            else:
+                print(f"❌ Failed to open URL after {max_retries} retries: {e}")
+                return False
+    
+    return False
+
 # Add a simple main function to run the script directly
 if __name__ == "__main__":
     import sys
@@ -489,6 +579,14 @@ if __name__ == "__main__":
             print("✅ Cookies loaded successfully")
         else:
             print(f"⚠️ Cookie file not found at {COOKIE_FILE}")
+        
+        # Navigate to the URL with retry
+        print(f"Navigating to URL: {url}")
+        open_url_with_retry(sb, url, "initial page load")
+
+        # Check if the page is fully loaded by looking for product elements
+        # For Newegg, we can check for the item-cell elements which contain products
+        check_page_loaded_with_retry(sb, '.item-cell', description="product listing page load")
         
         # Initial session refresh
         print("🔄 Performing initial session refresh...")

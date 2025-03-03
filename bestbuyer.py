@@ -129,33 +129,43 @@ def scrape_bestbuy():
     print("🔄 Performing initial session refresh...")
     refresh_session(sb)
     
-    # Navigate to the URL after loading cookies
+    # Navigate to the URL after loading cookies with retry mechanism
     print(f"Navigating back to {BESTBUY_SEARCH_URL}")
-    try:
-        sb.open(BESTBUY_SEARCH_URL)
-        print("✅ Page loaded successfully")
-    except Exception as e:
-        print(f"❌ Error loading page: {e}")
-        print("Trying again with a longer timeout...")
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
         try:
-            sb.driver.set_page_load_timeout(30)  # Increase timeout
             sb.open(BESTBUY_SEARCH_URL)
-            print("✅ Page loaded successfully on second attempt")
-        except Exception as e2:
-            print(f"❌ Error loading page on second attempt: {e2}")
-            print("Trying one more time with a different approach...")
-            try:
-                # Try a different approach - navigate to BestBuy homepage first
-                sb.open(BESTBUY_BASE_URL)
-                time.sleep(3)
-                print("✅ Homepage loaded, now navigating to search URL")
-                sb.open(BESTBUY_SEARCH_URL)
-                print("✅ Search page loaded successfully")
-            except Exception as e3:
-                print(f"❌ All attempts to load page failed: {e3}")
-                print("Please check your internet connection or if BestBuy is blocking automated access")
-                sb.driver.quit()
-                return
+            print("✅ Page loaded successfully")
+            break  # Exit the retry loop if successful
+        except Exception as e:
+            retry_count += 1
+            print(f"❌ Error loading page (Attempt {retry_count}/{max_retries}): {e}")
+            
+            if retry_count < max_retries:
+                # Start with 5 seconds and add 5 more seconds with each retry
+                timeout = 5 + (retry_count * 5)
+                print(f"Trying again with a longer timeout ({timeout} seconds)...")
+                try:
+                    sb.driver.set_page_load_timeout(timeout)
+                    continue  # Try again in the next iteration
+                except Exception as e2:
+                    print(f"❌ Error setting timeout: {e2}")
+            else:
+                print("⚠️ Maximum retries reached. Trying alternative approach...")
+                try:
+                    # Try a different approach - navigate to BestBuy homepage first
+                    sb.open(BESTBUY_BASE_URL)
+                    time.sleep(3)
+                    print("✅ Homepage loaded, now navigating to search URL")
+                    sb.open(BESTBUY_SEARCH_URL)
+                    print("✅ Search page loaded successfully")
+                except Exception as e3:
+                    print(f"❌ All attempts to load page failed: {e3}")
+                    print("Please check your internet connection or if BestBuy is blocking automated access")
+                    sb.driver.quit()
+                    return
     
     # Continuous monitoring loop
     refresh_count = 0
