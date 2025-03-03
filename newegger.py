@@ -9,7 +9,14 @@ import threading
 import json
 
 # Import configuration settings
-from scraperconfig import *
+from scraperconfig import (
+    COOKIE_FILE, PAGE_LOAD_WAIT, MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH,
+    MIN_REFRESH_COUNT, MAX_REFRESH_COUNT, NEWEGG_ORDERS_PAGE_URL, 
+    NEWEGG_SEARCH_PAGE_URL, NEWEGG_SHOW_COMBO_PRODUCTS, NEWEGG_PLACE_ORDER,
+    NEWEGG_PASSWORD, NEWEGG_CVV, DISCORD_WEBHOOK_URL, DISCORD_USER_ID,
+    ENABLE_DISCORD_STOCK_NOTIFICATIONS, ENABLE_DISCORD_STATUS_UPDATES,
+    STATUS_UPDATE_INTERVAL, LOG_DIRECTORY
+)
 
 # Global variable to track if the status update thread should continue running
 status_update_running = True
@@ -214,7 +221,7 @@ def scrape_newegg(url):
         for i, (name, price) in enumerate(zip(names, prices)):
             # Skip combo products if SHOW_COMBO_PRODUCTS is False
             product_name = name.text
-            if not SHOW_COMBO_PRODUCTS and "Combo" in product_name:
+            if not NEWEGG_SHOW_COMBO_PRODUCTS and "Combo" in product_name:
                 continue
                 
             # If we have a stock status for this index, use it; otherwise, mark as OUT OF STOCK
@@ -250,7 +257,7 @@ def scrape_newegg(url):
                     price_value = float('inf')  # If conversion fails, set to infinity
                 
                 # Skip combo products if SHOW_COMBO_PRODUCTS is False
-                if not SHOW_COMBO_PRODUCTS and "Combo" in product_name:
+                if not NEWEGG_SHOW_COMBO_PRODUCTS and "Combo" in product_name:
                     continue
                 
                 in_stock_items.append({
@@ -356,7 +363,7 @@ def scrape_newegg(url):
                                     
                                     if place_order_button:
                                         print(f"✅ Found Place Order button, clicking... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                                        if PLACE_ORDER:
+                                        if NEWEGG_PLACE_ORDER:
                                             place_order_button.click()
                                             print("🛒 Order placed!")
                                         else:
@@ -425,8 +432,8 @@ def refresh_session(sb):
     
     try:
         # Navigate to the orders page
-        print(f"📄 Navigating to orders page: {ORDERS_PAGE_URL}")
-        sb.open(ORDERS_PAGE_URL)
+        print(f"📄 Navigating to orders page: {NEWEGG_ORDERS_PAGE_URL}")
+        sb.open(NEWEGG_ORDERS_PAGE_URL)
         sb.sleep(2)  # Wait for page to load
         
         # Check if sign-in form appears
@@ -463,7 +470,7 @@ if __name__ == "__main__":
     
     try:
         # Get URL from command line argument or use default from constants
-        url = sys.argv[1] if len(sys.argv) > 1 else SEARCH_PAGE_URL
+        url = sys.argv[1] if len(sys.argv) > 1 else NEWEGG_SEARCH_PAGE_URL
         
         print(f"Starting continuous monitoring of: {url}")
         
@@ -561,7 +568,7 @@ if __name__ == "__main__":
                         product_name = name.text
                         
                         # Skip combo products if SHOW_COMBO_PRODUCTS is False
-                        if not SHOW_COMBO_PRODUCTS and "Combo" in product_name:
+                        if not NEWEGG_SHOW_COMBO_PRODUCTS and "Combo" in product_name:
                             continue
                             
                         # If we have a stock status for this index, use it; otherwise, mark as OUT OF STOCK
@@ -597,7 +604,7 @@ if __name__ == "__main__":
                             product_name = names[idx].text.strip()
                             
                             # Skip combo products if SHOW_COMBO_PRODUCTS is False
-                            if not SHOW_COMBO_PRODUCTS and "Combo" in product_name:
+                            if not NEWEGG_SHOW_COMBO_PRODUCTS and "Combo" in product_name:
                                 continue
                                 
                             product_price_text = prices[idx].text.strip()
@@ -715,7 +722,7 @@ if __name__ == "__main__":
                                                 
                                                 if place_order_button:
                                                     print(f"✅ Found Place Order button, clicking... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                                                    if PLACE_ORDER:
+                                                    if NEWEGG_PLACE_ORDER:
                                                         place_order_button.click()
                                                         print("🛒 Order placed!")
                                                     else:

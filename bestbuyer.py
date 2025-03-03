@@ -11,7 +11,8 @@ import datetime
 # Import configuration settings
 from scraperconfig import (
     COOKIE_FILE, PAGE_LOAD_WAIT, MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH,
-    MIN_REFRESH_COUNT, MAX_REFRESH_COUNT, BESTBUY_ORDERS_PAGE_URL, BESTBUY_PASSWORD
+    MIN_REFRESH_COUNT, MAX_REFRESH_COUNT, BESTBUY_ORDERS_PAGE_URL, BESTBUY_PASSWORD,
+    BESTBUY_BASE_URL, BESTBUY_CART_URL, BESTBUY_SEARCH_URL
 )
 
 def get_timestamp():
@@ -97,11 +98,6 @@ def scrape_bestbuy():
     """
     Basic function to scrape product names from BestBuy search page.
     """
-    # URL for BestBuy search
-    url = "https://www.bestbuy.ca/en-ca/collection/nvidia-graphic-cards-rtx-50-series/bltbd7cf78bd1d558ef?icmp=computing_evergreen_nvidia_graphics_cards_ssc_sbc_50_series"
-    base_url = "https://www.bestbuy.ca"
-    cart_url = "https://www.bestbuy.ca/en-ca/basket"
-    
     # Set up Chrome options to bypass bot detection
     chrome_options = {
         "disable_blink_features": "AutomationControlled",
@@ -109,7 +105,7 @@ def scrape_bestbuy():
     }
     
     # Start a new browser instance with undetected mode
-    print(f"Opening browser and navigating to {url}")
+    print(f"Opening browser and navigating to {BESTBUY_SEARCH_URL}")
     sb = sb_cdp.Chrome(uc=True, undetected=True, chrome_options=chrome_options)
     
     # Load cookies if available
@@ -120,31 +116,40 @@ def scrape_bestbuy():
     else:
         print(f"⚠️ Cookie file not found at {COOKIE_FILE}")
     
+    # Navigate to the search page first
+    print(f"Navigating to search page: {BESTBUY_SEARCH_URL}")
+    sb.open(BESTBUY_SEARCH_URL)
+    
+    # Add a 3-second pause to allow the search page to load completely
+    print("⏳ Pausing for 3 seconds to allow search page to load completely...")
+    sb.sleep(3)
+    print("✅ Initial page load complete")
+    
     # Initial session refresh
     print("🔄 Performing initial session refresh...")
     refresh_session(sb)
     
     # Navigate to the URL after loading cookies
-    print(f"Navigating to {url}")
+    print(f"Navigating back to {BESTBUY_SEARCH_URL}")
     try:
-        sb.open(url)
+        sb.open(BESTBUY_SEARCH_URL)
         print("✅ Page loaded successfully")
     except Exception as e:
         print(f"❌ Error loading page: {e}")
         print("Trying again with a longer timeout...")
         try:
             sb.driver.set_page_load_timeout(30)  # Increase timeout
-            sb.open(url)
+            sb.open(BESTBUY_SEARCH_URL)
             print("✅ Page loaded successfully on second attempt")
         except Exception as e2:
             print(f"❌ Error loading page on second attempt: {e2}")
             print("Trying one more time with a different approach...")
             try:
                 # Try a different approach - navigate to BestBuy homepage first
-                sb.open("https://www.bestbuy.ca/")
+                sb.open(BESTBUY_BASE_URL)
                 time.sleep(3)
                 print("✅ Homepage loaded, now navigating to search URL")
-                sb.open(url)
+                sb.open(BESTBUY_SEARCH_URL)
                 print("✅ Search page loaded successfully")
             except Exception as e3:
                 print(f"❌ All attempts to load page failed: {e3}")
@@ -171,8 +176,8 @@ def scrape_bestbuy():
                 next_session_refresh_count = random.randint(MIN_REFRESH_COUNT, MAX_REFRESH_COUNT)
                 print(f"⏰ Session will refresh after {next_session_refresh_count} page refreshes")
                 # Return to the product page after session refresh
-                print(f"🔄 Returning to product page after session refresh: {url}")
-                sb.open(url)
+                print(f"🔄 Returning to product page after session refresh: {BESTBUY_SEARCH_URL}")
+                sb.open(BESTBUY_SEARCH_URL)
                 sb.sleep(1)
             
             # Wait for page to load
@@ -186,13 +191,13 @@ def scrape_bestbuy():
                 if not product_check:
                     print("⚠️ No product elements found. Page may not have loaded correctly.")
                     print("Reloading page...")
-                    sb.open(url)
+                    sb.open(BESTBUY_SEARCH_URL)
                     sb.sleep(3)  # Wait a bit longer for reload
                     continue
             except Exception as e:
                 print(f"⚠️ Error checking page content: {e}")
                 print("Reloading page...")
-                sb.open(url)
+                sb.open(BESTBUY_SEARCH_URL)
                 sb.sleep(3)
                 continue
             
@@ -245,7 +250,7 @@ def scrape_bestbuy():
                         try:
                             href = links[i-1].get_attribute("href")
                             if href:
-                                product_url = href if href.startswith("http") else f"{base_url}{href}"
+                                product_url = href if href.startswith("http") else f"{BESTBUY_BASE_URL}{href}"
                         except:
                             product_url = "URL not available"
                     
@@ -332,13 +337,13 @@ def scrape_bestbuy():
                                 add_to_cart_button.click()
                                 print("✅ Add to Cart button clicked! Item added to cart.")
                                 
-                                # Wait for cart to update
-                                print("⏳ Waiting for cart to update...")
-                                sb.sleep(1)
+                                # Wait for cart to update - increased to 2 seconds
+                                print("⏳ Waiting for cart to update (2 seconds)...")
+                                sb.sleep(2)
                                 
                                 # Navigate to cart page
-                                print(f"🛒 Navigating to cart page: {cart_url}")
-                                sb.open(cart_url)
+                                print(f"🛒 Navigating to cart page: {BESTBUY_CART_URL}")
+                                sb.open(BESTBUY_CART_URL)
                                 print("✅ Cart page loaded successfully")
                             else:
                                 print("❌ Add to Cart button not found")
@@ -355,13 +360,13 @@ def scrape_bestbuy():
                             
                             # Return to search page after user continues
                             print("\n🔄 Returning to search page...")
-                            sb.open(url)
+                            sb.open(BESTBUY_SEARCH_URL)
                             sb.sleep(2)
                             
                         except Exception as e:
                             print(f"❌ Error processing product page: {e}")
                             # Return to search page if there was an error
-                            sb.open(url)
+                            sb.open(BESTBUY_SEARCH_URL)
                             sb.sleep(2)
                     else:
                         print("⚠️ Could not open product page: URL not available")
@@ -378,21 +383,21 @@ def scrape_bestbuy():
             print(f"\n⏱️  Refreshing in {refresh_time:.2f} seconds...")
             time.sleep(refresh_time)
             print("\n" + "=" * 80)
-            print(f"🔄 Refreshing page: {url}")
+            print(f"🔄 Refreshing page: {BESTBUY_SEARCH_URL}")
             print("=" * 80 + "\n")
             
             # Refresh the page
             try:
-                sb.open(url)
+                sb.open(BESTBUY_SEARCH_URL)
             except Exception as e:
                 print(f"❌ Error refreshing page: {e}")
                 print("Trying to recover...")
                 try:
                     # Try a different approach - navigate to BestBuy homepage first
-                    sb.open("https://www.bestbuy.ca/")
+                    sb.open(BESTBUY_BASE_URL)
                     time.sleep(2)
                     print("✅ Homepage loaded, now navigating back to search URL")
-                    sb.open(url)
+                    sb.open(BESTBUY_SEARCH_URL)
                 except Exception as e2:
                     print(f"❌ Recovery attempt failed: {e2}")
                     print("Continuing with next refresh...")
