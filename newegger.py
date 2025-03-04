@@ -25,6 +25,8 @@ status_update_running = True
 start_time = datetime.datetime.now()
 # Global variable to track refresh count
 refresh_count = 0
+# Add this at the top with other global variables
+notification_sent = False
 
 # Create a unique log filename with timestamp
 log_filename = os.path.join(LOG_DIRECTORY, f"newegg_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
@@ -280,16 +282,6 @@ def scrape_newegg(url):
         # Take a screenshot of the in-stock items
         screenshot_path = capture_screenshot(sb, "in_stock")
         
-        # Send Discord notification for in-stock items even in scan-only mode
-        if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-            stock_message = "🔍 **Items found in stock!**\n\n"
-            for i, item in enumerate(in_stock_items[:5]):  # Limit to first 5 items
-                stock_message += f"**{i+1}.** {item['name']}\n**Price:** {item['price_text']}\n\n"
-            stock_message += f"**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 **URL:** {url}"
-            
-            # Send notification with screenshot
-            send_discord_notification_with_file(stock_message, screenshot_path, title="🎯 Newegg Items In Stock!")
-        
         # Only proceed with add-to-cart if NEWEGG_ATC is True
         if NEWEGG_ATC and in_stock_items:
             lowest_price_item = in_stock_items[0]
@@ -314,7 +306,7 @@ def scrape_newegg(url):
                 
                 # Wait for cart to update
                 print("⏳ Waiting for cart to update...")
-                sb.sleep(2)
+                sb.sleep(1)
                 
                 # Log success with timestamp
                 print(f"✅ ITEM ADDED TO CART SUCCESSFULLY: {lowest_price_item['name']} ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -330,7 +322,7 @@ def scrape_newegg(url):
                 # Navigate to cart page with timestamp
                 print(f"\n🛒 Navigating to cart page... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
                 sb.open("https://secure.newegg.ca/shop/cart")
-                sb.sleep(2)  # Wait for cart page to load
+                sb.sleep(1)  # Wait for cart page to load
                 
                 # Try to click the Secure Checkout button
                 try:
@@ -359,7 +351,7 @@ def scrape_newegg(url):
                                     
                                     # Wait for signin to complete
                                     print("⏳ Waiting for sign-in to complete...")
-                                    sb.sleep(2)
+                                    sb.sleep(1)
                                     print("✅ Sign-in completed")
                         except Exception as e:
                             print(f"ℹ️ No sign-in form detected, continuing with checkout: {e}")
@@ -388,7 +380,7 @@ def scrape_newegg(url):
                                         
                                         # Wait before taking screenshot
                                         print("⏳ Waiting for confirmation page...")
-                                        sb.sleep(2)
+                                        sb.sleep(1)
                                         
                                         # Take a screenshot
                                         screenshot_path = f"order_confirmation_{time.strftime('%Y%m%d_%H%M%S')}.png"
@@ -398,7 +390,7 @@ def scrape_newegg(url):
                                         # Send Discord notification with order confirmation
                                         confirmation_message = f"🎉 **ORDER PLACED SUCCESSFULLY!**\n\n**Product:** {lowest_price_item['name']}\n**Price:** {lowest_price_item['price_text']}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n💳 Payment processed!"
                                         if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-                                            send_discord_notification(confirmation_message, title="✅ Newegg Order Confirmed!")
+                                            send_discord_notification_with_file(confirmation_message, screenshot_path, title="✅ Newegg Order Confirmed!")
                                     else:
                                         print("❌ Place Order button not found")
                                 except Exception as e:
@@ -457,7 +449,7 @@ def refresh_session(sb):
         # Navigate to the orders page
         print(f"📄 Navigating to orders page: {NEWEGG_ORDERS_PAGE_URL}")
         sb.open(NEWEGG_ORDERS_PAGE_URL)
-        sb.sleep(2)  # Wait for page to load
+        sb.sleep(1)  # Wait for page to load
         
         # Check if sign-in form appears
         print("🔍 Checking if sign-in form appears...")
@@ -475,7 +467,7 @@ def refresh_session(sb):
                     
                     # Wait for sign-in to complete
                     print("⏳ Waiting for sign-in to complete...")
-                    sb.sleep(2)
+                    sb.sleep(1)
                     print("✅ Sign-in completed")
         except Exception as e:
             print(f"ℹ️ No sign-in form detected: {e}")
@@ -526,7 +518,7 @@ def check_page_loaded_with_retry(sb, expected_element_selector, max_retries=3, r
                 print("🔄 Attempting to refresh the page...")
                 try:
                     sb.refresh()
-                    sb.sleep(3)
+                    sb.sleep(1)
                     # One final check after refresh
                     try:
                         if sb.find_element(expected_element_selector, timeout=3):
@@ -833,16 +825,6 @@ if __name__ == "__main__":
                     # Take a screenshot of the in-stock items
                     screenshot_path = capture_screenshot(sb, "in_stock")
                     
-                    # Send Discord notification for in-stock items even in scan-only mode
-                    if ENABLE_DISCORD_STOCK_NOTIFICATIONS and in_stock_items:
-                        stock_message = "🔍 **Items found in stock!**\n\n"
-                        for i, item in enumerate(in_stock_items[:5]):  # Limit to first 5 items
-                            stock_message += f"**{i+1}.** {item['name']}\n**Price:** {item['price_text']}\n\n"
-                        stock_message += f"**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 **URL:** {url}"
-                        
-                        # Send notification with screenshot
-                        send_discord_notification_with_file(stock_message, screenshot_path, title="🎯 Newegg Items In Stock!")
-                    
                     # Only proceed with add-to-cart if NEWEGG_ATC is True
                     if NEWEGG_ATC and in_stock_items:
                         lowest_price_item = in_stock_items[0]
@@ -867,7 +849,7 @@ if __name__ == "__main__":
                             
                             # Wait for cart to update
                             print("⏳ Waiting for cart to update...")
-                            sb.sleep(2)
+                            sb.sleep(1)
                             
                             # Log success with timestamp
                             print(f"✅ ITEM ADDED TO CART SUCCESSFULLY: {lowest_price_item['name']} ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -883,7 +865,7 @@ if __name__ == "__main__":
                             # Navigate to cart page with timestamp
                             print(f"\n🛒 Navigating to cart page... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
                             sb.open("https://secure.newegg.ca/shop/cart")
-                            sb.sleep(2)  # Wait for cart page to load
+                            sb.sleep(1)  # Wait for cart page to load
                             
                             # Try to click the Secure Checkout button
                             try:
@@ -912,7 +894,7 @@ if __name__ == "__main__":
                                                 
                                                 # Wait for sign-in to complete
                                                 print("⏳ Waiting for sign-in to complete...")
-                                                sb.sleep(2)
+                                                sb.sleep(1)
                                                 print("✅ Sign-in completed")
                                     except Exception as e:
                                         print(f"ℹ️ No sign-in form detected, continuing with checkout: {e}")
@@ -941,7 +923,7 @@ if __name__ == "__main__":
                                                     
                                                     # Wait before taking screenshot
                                                     print("⏳ Waiting for confirmation page...")
-                                                    sb.sleep(2)
+                                                    sb.sleep(1)
                                                     
                                                     # Take a screenshot
                                                     screenshot_path = f"order_confirmation_{time.strftime('%Y%m%d_%H%M%S')}.png"
@@ -951,7 +933,7 @@ if __name__ == "__main__":
                                                     # Send Discord notification with order confirmation
                                                     confirmation_message = f"🎉 **ORDER PLACED SUCCESSFULLY!**\n\n**Product:** {lowest_price_item['name']}\n**Price:** {lowest_price_item['price_text']}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n💳 Payment processed!"
                                                     if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-                                                        send_discord_notification(confirmation_message, title="✅ Newegg Order Confirmed!")
+                                                        send_discord_notification_with_file(confirmation_message, screenshot_path, title="✅ Newegg Order Confirmed!")
                                                     else:
                                                         print("❌ Payment processing disabled")
                                                 else:

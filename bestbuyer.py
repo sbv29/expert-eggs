@@ -106,7 +106,7 @@ def scrape_bestbuy():
     
     # Start a new browser instance with undetected mode
     print(f"Opening browser and navigating to {BESTBUY_SEARCH_URL}")
-    sb = sb_cdp.Chrome(uc=True, undetected=True, chrome_options=chrome_options)
+    sb = sb_cdp.Chrome()
     
     # Load cookies if available
     if os.path.exists(COOKIE_FILE):
@@ -351,28 +351,84 @@ def scrape_bestbuy():
                                 print("⏳ Waiting for cart to update (2 seconds)...")
                                 sb.sleep(2)
                                 
-                                # Navigate to cart page
-                                print(f"🛒 Navigating to cart page: {BESTBUY_CART_URL}")
-                                sb.open(BESTBUY_CART_URL)
-                                print("✅ Cart page loaded successfully")
-                            else:
-                                print("❌ Add to Cart button not found")
-                            
-                            # Pause the script until user decides to continue
-                            print("\n" + "=" * 80)
-                            print("⏸️  SCRIPT PAUSED - IN-STOCK ITEM FOUND!")
-                            print("=" * 80)
-                            print(f"Product: {first_item['name']}")
-                            print(f"Price: {first_item['price']}")
-                            print(f"URL: {product_url}")
-                            print("\nThe browser is now showing the cart page.")
-                            input("Press Enter to continue monitoring or Ctrl+C to exit...")
-                            
-                            # Return to search page after user continues
-                            print("\n🔄 Returning to search page...")
-                            sb.open(BESTBUY_SEARCH_URL)
-                            sb.sleep(2)
-                            
+                                # Navigate directly to checkout page instead of cart page
+                                print(f"🛒 Navigating directly to checkout page...")
+                                sb.open("https://www.bestbuy.ca/checkout/?qit=1#/en-ca/review")
+                                print("✅ Checkout page loaded successfully")
+
+                                # Wait for checkout page to load completely
+                                print("⏳ Waiting for checkout page elements to load...")
+                                sb.sleep(3)
+
+                                # Initialize variables for retry logic
+                                max_retries = 3
+                                retry_count = 0
+                                checkout_elements_found = False
+
+                                # Try to find checkout elements with retry logic
+                                while retry_count < max_retries and not checkout_elements_found:
+                                    try:
+                                        print(f"🔍 Looking for CVV field (Attempt {retry_count + 1}/{max_retries})...")
+                                        cvv_field = sb.find_element('input#cvv[name="cvv"]')
+                                        
+                                        if cvv_field:
+                                            print("✅ Found CVV field, entering value...")
+                                            cvv_field.send_keys("1234")
+                                            print("💳 CVV entered successfully!")
+                                            
+                                            # Look for Place Order button
+                                            try:
+                                                print("🔍 Looking for Place Order button...")
+                                                place_order_button = sb.find_element('button.style-module_button__ucc8a.style-module_primary__UIjVC.order-now')
+                                                
+                                                if place_order_button:
+                                                    print("✅ Place order button successfully located!")
+                                                    checkout_elements_found = True
+                                                    # Note: We're not clicking the button, just confirming we found it
+                                                else:
+                                                    print("❌ Place Order button not found")
+                                            except Exception as e:
+                                                print(f"❌ Error finding Place Order button: {e}")
+                                            # Will retry if retry_count < max_retries
+                                        else:
+                                            print("❌ CVV field not found")
+                                        # Will retry if retry_count < max_retries
+                                    except Exception as e:
+                                        print(f"❌ Error finding or entering CVV: {e}")
+                                        # Will retry if retry_count < max_retries
+                                    
+                                    # If elements not found and we haven't reached max retries, refresh and try again
+                                    if not checkout_elements_found and retry_count < max_retries - 1:
+                                        retry_count += 1
+                                        print(f"⏳ Sleeping 3 seconds before refreshing page (Attempt {retry_count + 1}/{max_retries})...")
+                                        sb.sleep(3)
+                                        print("🔄 Refreshing checkout page...")
+                                        sb.refresh()
+                                        sb.sleep(3)  # Wait for page to reload
+                                    else:
+                                        # Either we found the elements or reached max retries
+                                        break
+
+                                if checkout_elements_found:
+                                    print("✅ All checkout elements found successfully!")
+                                else:
+                                    print("⚠️ Could not find all checkout elements after maximum retries")
+
+                                # Pause the script until user decides to continue
+                                print("\n" + "=" * 80)
+                                print("⏸️  SCRIPT PAUSED - IN-STOCK ITEM FOUND!")
+                                print("=" * 80)
+                                print(f"Product: {first_item['name']}")
+                                print(f"Price: {first_item['price']}")
+                                print(f"URL: {product_url}")
+                                print("\nThe browser is now showing the checkout page.")
+                                input("Press Enter to continue monitoring or Ctrl+C to exit...")
+                                
+                                # Return to search page after user continues
+                                print("\n🔄 Returning to search page...")
+                                sb.open(BESTBUY_SEARCH_URL)
+                                sb.sleep(2)
+                                
                         except Exception as e:
                             print(f"❌ Error processing product page: {e}")
                             # Return to search page if there was an error

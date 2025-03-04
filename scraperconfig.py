@@ -13,9 +13,9 @@ LOG_DIRECTORY = "logs"  # Directory to store log files
 
 # Browser and page loading settings
 PAGE_LOAD_WAIT = 0  # Time in seconds to wait for page to load
-MIN_RANDOM_REFRESH = 2  # Minimum time in seconds between page refreshes
-MAX_RANDOM_REFRESH = 6  # Maximum time in seconds between page refreshes
-HEADLESS_MODE = True  # Set to True to run browsers without UI (headless mode)
+MIN_RANDOM_REFRESH = .25  # Minimum time in seconds between page refreshes
+MAX_RANDOM_REFRESH = 1  # Maximum time in seconds between page refreshes
+HEADLESS_MODE = False  # Set to True to run browsers without UI (headless mode)
 
 # Session refresh settings
 MIN_REFRESH_COUNT = 250  # Minimum number of refreshes before session refresh
@@ -31,10 +31,10 @@ STATUS_UPDATE_INTERVAL = 15 * 60  # Status updates in Discord (15 * 60 = 900 sec
 # ===== NEWEGG SPECIFIC SETTINGS =====
 
 NEWEGG_ORDERS_PAGE_URL = "https://secure.newegg.ca/account/settings"
-NEWEGG_SEARCH_PAGE_URL = "https://www.newegg.ca/p/pl?N=100007708%20601469153%20601469158%20601469157&d=rtx&isdeptsrh=1"
+NEWEGG_SEARCH_PAGE_URL = "https://www.newegg.ca/p/pl?d=cable&LeftPriceRange=4.99+4.99"
 NEWEGG_SHOW_COMBO_PRODUCTS = False  # Set to True to include combo products in search results
-NEWEGG_ATC = False  # Set to False for "scan only" mode (no automatic add to cart)
-NEWEGG_PLACE_ORDER = False  # Set to True to enable automatic order placement
+NEWEGG_ATC = True  # Set to False for "scan only" mode (no automatic add to cart)
+NEWEGG_PLACE_ORDER = False  # Set to True to enable automatic order placement (click the Place Order button)
 NEWEGG_PASSWORD = r'eRR")@KoDe:Y4$`'  # Your Newegg account password (using raw string)
 NEWEGG_CVV = "1234"  # Your credit card CVV code
 
@@ -42,7 +42,7 @@ NEWEGG_CVV = "1234"  # Your credit card CVV code
 
 BESTBUY_BASE_URL = "https://www.bestbuy.ca"
 BESTBUY_CART_URL = "https://www.bestbuy.ca/en-ca/basket"
-BESTBUY_SEARCH_URL = "https://www.bestbuy.ca/en-ca/collection/nvidia-graphic-cards-rtx-50-series/bltbd7cf78bd1d558ef?icmp=computing_evergreen_nvidia_graphics_cards_ssc_sbc_50_series"
+BESTBUY_SEARCH_URL = "https://www.bestbuy.ca/en-ca/search?path=currentPrice%253A%255B2%2BTO%2B3%255D%253Bcategory%253ABest%2BBuy%2BMobile%253BbrandName%253ABWOO&search=usb+cable&sort=priceLowToHigh"
 BESTBUY_ORDERS_PAGE_URL = "https://www.bestbuy.ca/order/en-ca/order-history"
 BESTBUY_PASSWORD = "MSIPerformance1!"  # Password for BestBuy account
 

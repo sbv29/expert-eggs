@@ -87,7 +87,7 @@ def get_and_save_cookies():
     }
 
     # Start browser session on dummy HTML file with undetected mode
-    sb = sb_cdp.Chrome(dummy_html_url, uc=True, undetected=True, chrome_options=chrome_options)
+    sb = sb_cdp.Chrome()
 
     # Load existing cookies if available
     if os.path.exists(COOKIE_FILE):
