@@ -12,9 +12,9 @@ COOKIE_FILE = os.path.join(COOKIE_DIR, "cookies.json")  # Path to cookie file
 LOG_DIRECTORY = "logs"  # Directory to store log files
 
 # Browser settings
-HEADLESS_MODE = False  # Set to True to run browsers without UI (headless mode)
-BROWSER_WINDOW_WIDTH = 1920  # Default browser window width in pixels
-BROWSER_WINDOW_HEIGHT = 1080  # Default browser window height in pixels
+HEADLESS_MODE = False # Set to True to run browsers without UI (headless mode)
+BROWSER_WINDOW_WIDTH = 2920  # Default browser window width in pixels
+BROWSER_WINDOW_HEIGHT = 3080  # Default browser window height in pixels
 
 # Discord notification settings
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1345475006058205194/XhCEXuvoOWtqO_7WS9XiIy_LLJwRcPPFmvcPoTS0772R1iaMSnMC1N-aO41oLRParlBD"

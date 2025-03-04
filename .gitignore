@@ -43,4 +43,7 @@ build/
 
 # Selenium specific
 geckodriver.log
-chromedriver.log 
+chromedriver.log
+
+# Ignore screenshots directory
+screenshots/ 

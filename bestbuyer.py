@@ -5,6 +5,7 @@ import time
 import os
 import random
 from seleniumbase import sb_cdp
+from seleniumbase.config import settings
 import sys
 import datetime
 import json
@@ -16,29 +17,78 @@ from scraperconfig import (
     BESTBUY_MIN_REFRESH_COUNT, BESTBUY_MAX_REFRESH_COUNT, BESTBUY_ORDERS_PAGE_URL, 
     BESTBUY_PASSWORD, BESTBUY_CVV, BESTBUY_BASE_URL, BESTBUY_CART_URL, BESTBUY_SEARCH_URL,
     HEADLESS_MODE, DISCORD_WEBHOOK_URL, DISCORD_USER_ID, ENABLE_DISCORD_STOCK_NOTIFICATIONS,
-    BESTBUY_ATC, BESTBUY_PLACE_ORDER
+    BESTBUY_ATC, BESTBUY_PLACE_ORDER, BESTBUY_BROWSER_WIDTH, BESTBUY_BROWSER_HEIGHT
 )
+
+# Set browser window size before initialization
+settings.CHROME_START_WIDTH = BESTBUY_BROWSER_WIDTH
+settings.CHROME_START_HEIGHT = BESTBUY_BROWSER_HEIGHT
 
 def get_timestamp():
     """Return a formatted timestamp string."""
     return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
-def capture_screenshot(sb, prefix="screenshot"):
+def capture_screenshot(sb, prefix="screenshot", full_page=True):
     """
-    Captures a screenshot of the current browser window.
+    Captures a screenshot of the current browser window or full page.
     
     Args:
         sb: SeleniumBase instance
         prefix (str): Prefix for the screenshot filename
+        full_page (bool): Whether to capture the full page or just the visible area
         
     Returns:
         str: Path to the saved screenshot file
     """
+    # Create screenshots directory if it doesn't exist
+    screenshots_dir = "screenshots"
+    if not os.path.exists(screenshots_dir):
+        os.makedirs(screenshots_dir)
+        print(f"📁 Created screenshots directory: {screenshots_dir}")
+    
     timestamp = time.strftime('%Y%m%d_%H%M%S')
-    screenshot_path = f"{prefix}_{timestamp}.png"
+    screenshot_filename = f"{prefix}_{timestamp}.png"
+    screenshot_path = os.path.join(screenshots_dir, screenshot_filename)
+    
     try:
-        # Take the screenshot - use the standard method without full_page parameter
-        # as it might not be supported in this version of SeleniumBase
+        if full_page:
+            # Method 1: Try using SeleniumBase's built-in full page screenshot
+            try:
+                print("📸 Attempting to capture full page screenshot...")
+                sb.save_screenshot(screenshot_path, full_page=True)
+                print(f"✅ Full page screenshot saved to: {screenshot_path}")
+                return screenshot_path
+            except Exception as e:
+                print(f"⚠️ Could not capture full page screenshot with built-in method: {e}")
+                
+                # Method 2: Fallback to JavaScript method for full page screenshot
+                try:
+                    print("📸 Attempting alternative full page screenshot method...")
+                    # Get the page dimensions
+                    total_width = sb.execute_script("return document.body.offsetWidth")
+                    total_height = sb.execute_script("return document.body.parentNode.scrollHeight")
+                    
+                    # Set window size to capture everything
+                    original_size = sb.get_window_size()
+                    sb.set_window_size(total_width, total_height)
+                    
+                    # Wait for resize to take effect
+                    sb.sleep(0.5)
+                    
+                    # Take the screenshot
+                    sb.save_screenshot(screenshot_path)
+                    
+                    # Restore original size
+                    sb.set_window_size(original_size[0], original_size[1])
+                    
+                    print(f"✅ Full page screenshot saved using alternative method: {screenshot_path}")
+                    return screenshot_path
+                except Exception as e2:
+                    print(f"⚠️ Alternative full page screenshot method failed: {e2}")
+                    # Fall back to regular screenshot
+                    print("📸 Falling back to regular screenshot...")
+        
+        # Regular screenshot (visible area only)
         sb.save_screenshot(screenshot_path)
         print(f"📸 Screenshot saved to: {screenshot_path}")
         return screenshot_path
@@ -183,8 +233,14 @@ def scrape_bestbuy():
     }
     
     # Start a new browser instance with undetected mode
-    print(f"Opening browser and navigating to {BESTBUY_SEARCH_URL}")
-    sb = sb_cdp.Chrome()
+    print(f"Opening browser in {'headless' if HEADLESS_MODE else 'visible'} mode and navigating to {BESTBUY_SEARCH_URL}")
+    print(f"Browser window size: {BESTBUY_BROWSER_WIDTH}x{BESTBUY_BROWSER_HEIGHT}")
+    
+    # Initialize Chrome with headless mode setting from config
+    if HEADLESS_MODE:
+        sb = sb_cdp.Chrome(headless=True, **chrome_options)
+    else:
+        sb = sb_cdp.Chrome(**chrome_options)
     
     # Load cookies if available
     if os.path.exists(COOKIE_FILE):
@@ -383,7 +439,7 @@ def scrape_bestbuy():
                         print(f"   URL: {item['url']}")
                     
                     # Take a screenshot of the in-stock items
-                    screenshot_path = capture_screenshot(sb, "bestbuy_in_stock")
+                    screenshot_path = capture_screenshot(sb, "bestbuy_in_stock", full_page=True)
                     print(f"📸 Screenshot saved to: {screenshot_path}")
                     
                     # Send Discord notification with screenshot
@@ -487,10 +543,7 @@ def scrape_bestbuy():
                                                             
                                                             # Wait for confirmation page
                                                             print("⏳ Waiting for confirmation page...")
-                                                            sb.sleep(3)
-                                                            
-                                                            # Take a screenshot of the confirmation page
-                                                            confirmation_screenshot = capture_screenshot(sb, "bestbuy_order_confirmation")
+                                                            confirmation_screenshot = capture_screenshot(sb, "bestbuy_order_confirmation", full_page=True)
                                                             
                                                             # Send Discord notification with order confirmation
                                                             confirmation_message = f"🎉 **ORDER PLACED SUCCESSFULLY!**\n\n**Product:** {first_item['name']}\n**Price:** {first_item['price']}\n**Time:** {get_timestamp()}\n\n💳 Payment processed!"
