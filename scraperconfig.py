@@ -29,27 +29,20 @@ STATUS_UPDATE_INTERVAL = 15 * 60  # Status updates in Discord (15 * 60 = 900 sec
 
 # ===== NEWEGG SPECIFIC SETTINGS =====
 
-# Newegg URLs
-NEWEGG_ORDERS_PAGE_URL = "https://secure.newegg.ca/orders/list"  # Orders page URL for session refreshing
-NEWEGG_SEARCH_PAGE_URL = "https://www.newegg.ca/p/pl?N=100007708%20601469153%20601469158"  # Search page URL for product search
-
-# Newegg product filtering settings
-NEWEGG_SHOW_COMBO_PRODUCTS = True  # Set to True to show products with "Combo" in the title
-
-# Newegg checkout settings
-NEWEGG_PLACE_ORDER = False  # Set to False to disable actual order placement (do not click place order button)
-NEWEGG_PASSWORD = "JW5*lObuFv1#xM*"  # Password for Newegg account credentials
-NEWEGG_CVV = "1234"  # CVV code for credit card
+NEWEGG_ORDERS_PAGE_URL = "https://secure.newegg.ca/account/settings"
+NEWEGG_SEARCH_PAGE_URL = "https://www.newegg.ca/p/pl?N=100007708%20601469153%20601469158%20601469157&d=rtx&isdeptsrh=1"
+NEWEGG_SHOW_COMBO_PRODUCTS = False  # Set to True to include combo products in search results
+NEWEGG_ATC = False  # Set to False for "scan only" mode (no automatic add to cart)
+NEWEGG_PLACE_ORDER = False  # Set to True to enable automatic order placement
+NEWEGG_PASSWORD = r'eRR")@KoDe:Y4$`'  # Your Newegg account password (using raw string)
+NEWEGG_CVV = "1234"  # Your credit card CVV code
 
 # ===== BESTBUY SPECIFIC SETTINGS =====
 
-# BestBuy URLs
 BESTBUY_BASE_URL = "https://www.bestbuy.ca"
 BESTBUY_CART_URL = "https://www.bestbuy.ca/en-ca/basket"
 BESTBUY_SEARCH_URL = "https://www.bestbuy.ca/en-ca/collection/nvidia-graphic-cards-rtx-50-series/bltbd7cf78bd1d558ef?icmp=computing_evergreen_nvidia_graphics_cards_ssc_sbc_50_series"
 BESTBUY_ORDERS_PAGE_URL = "https://www.bestbuy.ca/order/en-ca/order-history"
-
-# BestBuy account settings
 BESTBUY_PASSWORD = "MSIPerformance1!"  # Password for BestBuy account
 
 # ===== DIRECTORY CREATION =====
@@ -60,4 +53,4 @@ if not os.path.exists(LOG_DIRECTORY):
 
 # Create cookies directory if it doesn't exist
 if not os.path.exists(COOKIE_DIR):
-    os.makedirs(COOKIE_DIR) 
+    os.makedirs(COOKIE_DIR)

@@ -12,10 +12,10 @@ import json
 from scraperconfig import (
     COOKIE_FILE, PAGE_LOAD_WAIT, MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH,
     MIN_REFRESH_COUNT, MAX_REFRESH_COUNT, NEWEGG_ORDERS_PAGE_URL, 
-    NEWEGG_SEARCH_PAGE_URL, NEWEGG_SHOW_COMBO_PRODUCTS, NEWEGG_PLACE_ORDER,
-    NEWEGG_PASSWORD, NEWEGG_CVV, DISCORD_WEBHOOK_URL, DISCORD_USER_ID,
-    ENABLE_DISCORD_STOCK_NOTIFICATIONS, ENABLE_DISCORD_STATUS_UPDATES,
-    STATUS_UPDATE_INTERVAL, LOG_DIRECTORY
+    NEWEGG_SEARCH_PAGE_URL, NEWEGG_SHOW_COMBO_PRODUCTS, NEWEGG_ATC,
+    NEWEGG_PLACE_ORDER, NEWEGG_PASSWORD, NEWEGG_CVV, DISCORD_WEBHOOK_URL, 
+    DISCORD_USER_ID, ENABLE_DISCORD_STOCK_NOTIFICATIONS, 
+    ENABLE_DISCORD_STATUS_UPDATES, STATUS_UPDATE_INTERVAL, LOG_DIRECTORY
 )
 
 # Global variable to track if the status update thread should continue running
@@ -276,8 +276,21 @@ def scrape_newegg(url):
         for i, item in enumerate(in_stock_items):
             print(f"{i+1}. {item['name']} - {item['price_text']}")
         
-        # Automatically select the lowest-priced item
-        if in_stock_items:
+        # Take a screenshot of the in-stock items
+        screenshot_path = capture_screenshot(sb, "in_stock")
+        
+        # Send Discord notification for in-stock items even in scan-only mode
+        if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
+            stock_message = "🔍 **Items found in stock!**\n\n"
+            for i, item in enumerate(in_stock_items[:5]):  # Limit to first 5 items
+                stock_message += f"**{i+1}.** {item['name']}\n**Price:** {item['price_text']}\n\n"
+            stock_message += f"**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 **URL:** {url}"
+            
+            # Send notification with screenshot
+            send_discord_notification_with_file(stock_message, screenshot_path, title="🎯 Newegg Items In Stock!")
+        
+        # Only proceed with add-to-cart if NEWEGG_ATC is True
+        if NEWEGG_ATC and in_stock_items:
             lowest_price_item = in_stock_items[0]
             print(f"\n🔍 Automatically selecting lowest-priced item: {lowest_price_item['name']} - {lowest_price_item['price_text']}")
             
@@ -305,10 +318,13 @@ def scrape_newegg(url):
                 # Log success with timestamp
                 print(f"✅ ITEM ADDED TO CART SUCCESSFULLY: {lowest_price_item['name']} ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
                 
+                # Take a screenshot of the cart page
+                cart_screenshot_path = capture_screenshot(sb, "cart")
+                
                 # Send Discord notification
                 notification_message = f"🛒 **Item added to cart!**\n\n**Product:** {lowest_price_item['name']}\n**Price:** {lowest_price_item['price_text']}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 **Cart URL:** https://secure.newegg.ca/shop/cart"
                 if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-                    send_discord_notification(notification_message, title="🎯 Newegg Item In Stock!")
+                    send_discord_notification_with_file(notification_message, cart_screenshot_path, title="🎯 Newegg Item In Stock!")
                 
                 # Navigate to cart page with timestamp
                 print(f"\n🛒 Navigating to cart page... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -404,6 +420,12 @@ def scrape_newegg(url):
                 print(f"❌ Error clicking Add to Cart button: {e}")
                 # If there was an error, refresh the page
                 sb.open(url)
+        else:
+            if not NEWEGG_ATC:
+                print("\n🔍 Running in SCAN ONLY mode - skipping add to cart")
+                # Pause briefly to allow user to see the in-stock items
+                print("⏸️ Press Enter to continue monitoring...")
+                input()
     else:
         if not products:
             print("No products found.")
@@ -554,6 +576,80 @@ def open_url_with_retry(sb, url, description="page load", max_retries=3, retry_d
     
     return False
 
+# Add this function to capture and save screenshots
+def capture_screenshot(sb, prefix="screenshot"):
+    """
+    Captures a screenshot of the current browser window.
+    
+    Args:
+        sb: SeleniumBase browser instance
+        prefix (str): Prefix for the screenshot filename
+        
+    Returns:
+        str: Path to the saved screenshot file
+    """
+    timestamp = time.strftime('%Y%m%d_%H%M%S')
+    screenshot_path = f"{prefix}_{timestamp}.png"
+    try:
+        sb.save_screenshot(screenshot_path)
+        print(f"📸 Screenshot saved to: {screenshot_path}")
+        return screenshot_path
+    except Exception as e:
+        print(f"❌ Error capturing screenshot: {e}")
+        return None
+
+# Add this function to send Discord notifications with file attachments
+def send_discord_notification_with_file(message, file_path=None, title=None, color=5814783):
+    """
+    Sends a notification to Discord using a webhook with an optional file attachment.
+    
+    Args:
+        message (str): The message to send
+        file_path (str, optional): Path to a file to attach
+        title (str, optional): The title of the embed
+        color (int, optional): The color of the embed
+    """
+    if not DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL == "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN":
+        print("⚠️ Discord webhook URL not configured. Notification not sent.")
+        return
+    
+    # Create the payload
+    payload = {
+        "content": f"<@{DISCORD_USER_ID}>" if DISCORD_USER_ID else "",
+        "embeds": [
+            {
+                "title": title if title else "Newegg Monitor Notification",
+                "description": message,
+                "color": color,
+                "footer": {
+                    "text": f"Newegg Monitor • {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                }
+            }
+        ]
+    }
+    
+    try:
+        if file_path and os.path.exists(file_path):
+            # Send with file attachment
+            with open(file_path, 'rb') as f:
+                files = {
+                    'file': (os.path.basename(file_path), f, 'image/png'),
+                    'payload_json': (None, json.dumps(payload))
+                }
+                response = requests.post(DISCORD_WEBHOOK_URL, files=files)
+        else:
+            # Send without file attachment
+            response = requests.post(
+                DISCORD_WEBHOOK_URL,
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"}
+            )
+        
+        response.raise_for_status()
+        print(f"✅ Discord notification sent successfully")
+    except Exception as e:
+        print(f"❌ Error sending Discord notification: {e}")
+
 # Add a simple main function to run the script directly
 if __name__ == "__main__":
     import sys
@@ -700,11 +796,6 @@ if __name__ == "__main__":
                     for i, idx in enumerate(in_stock_indices):
                         if idx < len(names) and idx < len(prices):
                             product_name = names[idx].text.strip()
-                            
-                            # Skip combo products if SHOW_COMBO_PRODUCTS is False
-                            if not NEWEGG_SHOW_COMBO_PRODUCTS and "Combo" in product_name:
-                                continue
-                                
                             product_price_text = prices[idx].text.strip()
                             
                             # Extract numeric price value (remove currency symbols, commas, etc.)
@@ -717,6 +808,10 @@ if __name__ == "__main__":
                             except ValueError:
                                 price_value = float('inf')
                             
+                            # Skip combo products if SHOW_COMBO_PRODUCTS is False
+                            if not NEWEGG_SHOW_COMBO_PRODUCTS and "Combo" in product_name:
+                                continue
+                                
                             in_stock_items.append({
                                 'index': i,
                                 'product_idx': idx,
@@ -733,8 +828,21 @@ if __name__ == "__main__":
                     for i, item in enumerate(in_stock_items):
                         print(f"{i+1}. {item['name']} - {item['price_text']}")
                     
-                    # Automatically select the lowest-priced item
-                    if in_stock_items:
+                    # Take a screenshot of the in-stock items
+                    screenshot_path = capture_screenshot(sb, "in_stock")
+                    
+                    # Send Discord notification for in-stock items even in scan-only mode
+                    if ENABLE_DISCORD_STOCK_NOTIFICATIONS and in_stock_items:
+                        stock_message = "🔍 **Items found in stock!**\n\n"
+                        for i, item in enumerate(in_stock_items[:5]):  # Limit to first 5 items
+                            stock_message += f"**{i+1}.** {item['name']}\n**Price:** {item['price_text']}\n\n"
+                        stock_message += f"**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 **URL:** {url}"
+                        
+                        # Send notification with screenshot
+                        send_discord_notification_with_file(stock_message, screenshot_path, title="🎯 Newegg Items In Stock!")
+                    
+                    # Only proceed with add-to-cart if NEWEGG_ATC is True
+                    if NEWEGG_ATC and in_stock_items:
                         lowest_price_item = in_stock_items[0]
                         print(f"\n🔍 Automatically selecting lowest-priced item: {lowest_price_item['name']} - {lowest_price_item['price_text']}")
                         
@@ -762,10 +870,13 @@ if __name__ == "__main__":
                             # Log success with timestamp
                             print(f"✅ ITEM ADDED TO CART SUCCESSFULLY: {lowest_price_item['name']} ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
                             
+                            # Take a screenshot of the cart page
+                            cart_screenshot_path = capture_screenshot(sb, "cart")
+                            
                             # Send Discord notification
                             notification_message = f"🛒 **Item added to cart!**\n\n**Product:** {lowest_price_item['name']}\n**Price:** {lowest_price_item['price_text']}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 **Cart URL:** https://secure.newegg.ca/shop/cart"
                             if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-                                send_discord_notification(notification_message, title="🎯 Newegg Item In Stock!")
+                                send_discord_notification_with_file(notification_message, cart_screenshot_path, title="🎯 Newegg Item In Stock!")
                             
                             # Navigate to cart page with timestamp
                             print(f"\n🛒 Navigating to cart page... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
