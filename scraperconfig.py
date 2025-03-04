@@ -12,9 +12,9 @@ COOKIE_FILE = os.path.join(COOKIE_DIR, "cookies.json")  # Path to cookie file
 LOG_DIRECTORY = "logs"  # Directory to store log files
 
 # Browser settings
-HEADLESS_MODE = False # Set to True to run browsers without UI (headless mode)
+HEADLESS_MODE = True # Set to True to run browsers without UI (headless mode)
 BROWSER_WINDOW_WIDTH = 2920  # Default browser window width in pixels
-BROWSER_WINDOW_HEIGHT = 3080  # Default browser window height in pixels
+BROWSER_WINDOW_HEIGHT = 3080  # De1ault browser window height in pixels
 
 # Discord notification settings
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1345475006058205194/XhCEXuvoOWtqO_7WS9XiIy_LLJwRcPPFmvcPoTS0772R1iaMSnMC1N-aO41oLRParlBD"
@@ -27,21 +27,21 @@ STATUS_UPDATE_INTERVAL = 15 * 60  # Status updates in Discord (15 * 60 = 900 sec
 
 # Newegg URLs
 NEWEGG_ORDERS_PAGE_URL = "https://secure.newegg.ca/account/settings"
-NEWEGG_SEARCH_PAGE_URL = "https://www.newegg.ca/p/pl?d=cable&LeftPriceRange=4.99+4.99"
+NEWEGG_SEARCH_PAGE_URL = "https://www.newegg.ca/p/pl?N=100007708%20601469153%20601469158%20601469157"
 
 # Newegg product filtering settings
 NEWEGG_SHOW_COMBO_PRODUCTS = False  # Set to True to include combo products in search results
 
 # Newegg checkout settings
 NEWEGG_ATC = True  # Set to False for "scan only" mode (no automatic add to cart)
-NEWEGG_PLACE_ORDER = False  # Set to True to enable automatic order placement (click the Place Order button)
+NEWEGG_PLACE_ORDER = True  # Set to True to enable automatic order placement (click the Place Order button)
 NEWEGG_PASSWORD = r'eRR")@KoDe:Y4$`'  # Your Newegg account password (using raw string)
 NEWEGG_CVV = "1234"  # Your credit card CVV code
 
 # Newegg timing settings
 NEWEGG_PAGE_LOAD_WAIT = 0  # Time in seconds to wait for page to load
-NEWEGG_MIN_RANDOM_REFRESH = 0.25  # Minimum time in seconds between page refreshes
-NEWEGG_MAX_RANDOM_REFRESH = 1  # Maximum time in seconds between page refreshes
+NEWEGG_MIN_RANDOM_REFRESH = 2.2  # Minimum time in seconds between page refreshes
+NEWEGG_MAX_RANDOM_REFRESH = 3.8  # Maximum time in seconds between page refreshes
 NEWEGG_MIN_REFRESH_COUNT = 250  # Minimum number of refreshes before session refresh
 NEWEGG_MAX_REFRESH_COUNT = 300  # Maximum number of refreshes before session refresh
 
