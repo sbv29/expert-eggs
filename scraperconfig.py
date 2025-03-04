@@ -15,6 +15,7 @@ LOG_DIRECTORY = "logs"  # Directory to store log files
 PAGE_LOAD_WAIT = 0  # Time in seconds to wait for page to load
 MIN_RANDOM_REFRESH = 2  # Minimum time in seconds between page refreshes
 MAX_RANDOM_REFRESH = 6  # Maximum time in seconds between page refreshes
+HEADLESS_MODE = True  # Set to True to run browsers without UI (headless mode)
 
 # Session refresh settings
 MIN_REFRESH_COUNT = 250  # Minimum number of refreshes before session refresh

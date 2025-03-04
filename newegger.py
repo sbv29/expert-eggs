@@ -15,7 +15,8 @@ from scraperconfig import (
     NEWEGG_SEARCH_PAGE_URL, NEWEGG_SHOW_COMBO_PRODUCTS, NEWEGG_ATC,
     NEWEGG_PLACE_ORDER, NEWEGG_PASSWORD, NEWEGG_CVV, DISCORD_WEBHOOK_URL, 
     DISCORD_USER_ID, ENABLE_DISCORD_STOCK_NOTIFICATIONS, 
-    ENABLE_DISCORD_STATUS_UPDATES, STATUS_UPDATE_INTERVAL, LOG_DIRECTORY
+    ENABLE_DISCORD_STATUS_UPDATES, STATUS_UPDATE_INTERVAL, LOG_DIRECTORY,
+    HEADLESS_MODE
 )
 
 # Global variable to track if the status update thread should continue running
@@ -163,8 +164,8 @@ def scrape_newegg(url):
     Returns:
         list: List of product dictionaries containing name, price, and stock status
     """
-    # Start a new browser instance
-    sb = sb_cdp.Chrome(url)
+    # Start a new browser instance with headless mode setting from config
+    sb = sb_cdp.Chrome(url, headless=HEADLESS_MODE)
     
     # Load cookies if available
     if os.path.exists(COOKIE_FILE):
@@ -659,13 +660,14 @@ if __name__ == "__main__":
         url = sys.argv[1] if len(sys.argv) > 1 else NEWEGG_SEARCH_PAGE_URL
         
         print(f"Starting continuous monitoring of: {url}")
+        print(f"🖥️ Browser mode: {'Headless' if HEADLESS_MODE else 'Visible'}")
         
         # Start the status update thread
         status_thread = threading.Thread(target=status_update_thread, daemon=True)
         status_thread.start()
         
-        # Start a new browser instance
-        sb = sb_cdp.Chrome(url)
+        # Start a new browser instance with headless mode setting from config
+        sb = sb_cdp.Chrome(url, headless=HEADLESS_MODE)
         
         # Load cookies if available
         if os.path.exists(COOKIE_FILE):
