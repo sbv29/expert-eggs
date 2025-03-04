@@ -7,17 +7,95 @@ import random
 from seleniumbase import sb_cdp
 import sys
 import datetime
+import json
+import requests
 
 # Import configuration settings
 from scraperconfig import (
-    COOKIE_FILE, PAGE_LOAD_WAIT, MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH,
-    MIN_REFRESH_COUNT, MAX_REFRESH_COUNT, BESTBUY_ORDERS_PAGE_URL, BESTBUY_PASSWORD,
-    BESTBUY_BASE_URL, BESTBUY_CART_URL, BESTBUY_SEARCH_URL
+    COOKIE_FILE, BESTBUY_PAGE_LOAD_WAIT, BESTBUY_MIN_RANDOM_REFRESH, BESTBUY_MAX_RANDOM_REFRESH,
+    BESTBUY_MIN_REFRESH_COUNT, BESTBUY_MAX_REFRESH_COUNT, BESTBUY_ORDERS_PAGE_URL, 
+    BESTBUY_PASSWORD, BESTBUY_CVV, BESTBUY_BASE_URL, BESTBUY_CART_URL, BESTBUY_SEARCH_URL,
+    HEADLESS_MODE, DISCORD_WEBHOOK_URL, DISCORD_USER_ID, ENABLE_DISCORD_STOCK_NOTIFICATIONS,
+    BESTBUY_ATC, BESTBUY_PLACE_ORDER
 )
 
 def get_timestamp():
     """Return a formatted timestamp string."""
     return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+def capture_screenshot(sb, prefix="screenshot"):
+    """
+    Captures a screenshot of the current browser window.
+    
+    Args:
+        sb: SeleniumBase instance
+        prefix (str): Prefix for the screenshot filename
+        
+    Returns:
+        str: Path to the saved screenshot file
+    """
+    timestamp = time.strftime('%Y%m%d_%H%M%S')
+    screenshot_path = f"{prefix}_{timestamp}.png"
+    try:
+        # Take the screenshot - use the standard method without full_page parameter
+        # as it might not be supported in this version of SeleniumBase
+        sb.save_screenshot(screenshot_path)
+        print(f"📸 Screenshot saved to: {screenshot_path}")
+        return screenshot_path
+    except Exception as e:
+        print(f"❌ Error capturing screenshot: {e}")
+        return None
+
+def send_discord_notification_with_file(message, file_path=None, title=None, color=5814783):
+    """
+    Sends a notification to Discord using a webhook with an optional file attachment.
+    
+    Args:
+        message (str): The message to send
+        file_path (str, optional): Path to a file to attach
+        title (str, optional): The title of the embed
+        color (int, optional): The color of the embed
+    """
+    if not DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL == "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN":
+        print("⚠️ Discord webhook URL not configured. Notification not sent.")
+        return
+    
+    # Create the payload
+    payload = {
+        "content": f"<@{DISCORD_USER_ID}>" if DISCORD_USER_ID else "",
+        "embeds": [
+            {
+                "title": title if title else "BestBuy Monitor Notification",
+                "description": message,
+                "color": color,
+                "footer": {
+                    "text": f"BestBuy Monitor • {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                }
+            }
+        ]
+    }
+    
+    try:
+        if file_path and os.path.exists(file_path):
+            # Send with file attachment
+            with open(file_path, 'rb') as f:
+                files = {
+                    'file': (os.path.basename(file_path), f, 'image/png'),
+                    'payload_json': (None, json.dumps(payload))
+                }
+                response = requests.post(DISCORD_WEBHOOK_URL, files=files)
+        else:
+            # Send without file attachment
+            response = requests.post(
+                DISCORD_WEBHOOK_URL,
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"}
+            )
+        
+        response.raise_for_status()
+        print(f"✅ Discord notification sent successfully")
+    except Exception as e:
+        print(f"❌ Error sending Discord notification: {e}")
 
 def refresh_session(sb):
     """
@@ -170,7 +248,7 @@ def scrape_bestbuy():
     # Continuous monitoring loop
     refresh_count = 0
     # Calculate next refresh count (random between MIN and MAX)
-    next_session_refresh_count = random.randint(MIN_REFRESH_COUNT, MAX_REFRESH_COUNT)
+    next_session_refresh_count = random.randint(BESTBUY_MIN_REFRESH_COUNT, BESTBUY_MAX_REFRESH_COUNT)
     print(f"⏰ Session will refresh after {next_session_refresh_count} page refreshes")
     
     try:
@@ -183,7 +261,7 @@ def scrape_bestbuy():
             if refresh_count >= next_session_refresh_count:
                 refresh_session(sb)
                 refresh_count = 0
-                next_session_refresh_count = random.randint(MIN_REFRESH_COUNT, MAX_REFRESH_COUNT)
+                next_session_refresh_count = random.randint(BESTBUY_MIN_REFRESH_COUNT, BESTBUY_MAX_REFRESH_COUNT)
                 print(f"⏰ Session will refresh after {next_session_refresh_count} page refreshes")
                 # Return to the product page after session refresh
                 print(f"🔄 Returning to product page after session refresh: {BESTBUY_SEARCH_URL}")
@@ -191,8 +269,8 @@ def scrape_bestbuy():
                 sb.sleep(1)
             
             # Wait for page to load
-            print(f"⏳ Waiting {PAGE_LOAD_WAIT} seconds for page to load...")
-            sb.sleep(PAGE_LOAD_WAIT)
+            print(f"⏳ Waiting {BESTBUY_PAGE_LOAD_WAIT} seconds for page to load...")
+            sb.sleep(BESTBUY_PAGE_LOAD_WAIT)
             
             # Check if page loaded correctly
             try:
@@ -304,138 +382,175 @@ def scrape_bestbuy():
                         print(f"{idx}. {item['name']} - {item['price']}")
                         print(f"   URL: {item['url']}")
                     
+                    # Take a screenshot of the in-stock items
+                    screenshot_path = capture_screenshot(sb, "bestbuy_in_stock")
+                    print(f"📸 Screenshot saved to: {screenshot_path}")
+                    
+                    # Send Discord notification with screenshot
+                    if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
+                        stock_message = "🔍 **BestBuy items found in stock!**\n\n"
+                        for i, item in enumerate(in_stock_items[:5]):  # Limit to first 5 items
+                            stock_message += f"**{i+1}.** {item['name']}\n**Price:** {item['price']}\n\n"
+                        stock_message += f"**Time:** {get_timestamp()}\n\n🔗 **URL:** {BESTBUY_SEARCH_URL}"
+                        
+                        # Send notification with screenshot
+                        print(f"📤 Sending Discord notification with screenshot: {screenshot_path}")
+                        send_discord_notification_with_file(stock_message, screenshot_path, title="🎯 BestBuy Items In Stock!")
+                    
                     # Ask user which in-stock item to open
                     if len(in_stock_items) > 1:
                         print("\n🔍 Multiple in-stock items found. Opening the first one...")
                     
-                    # Open the first in-stock item's URL
-                    first_item = in_stock_items[0]
-                    product_url = first_item['url']
-                    
-                    if product_url and product_url != "URL not available":
-                        print(f"\n🌐 Opening product page: {product_url}")
-                        print(f"⏳ Opening product page for: {first_item['name']}")
+                    # Only proceed with add-to-cart if BESTBUY_ATC is True
+                    if BESTBUY_ATC:
+                        # Open the first in-stock item's URL
+                        first_item = in_stock_items[0]
+                        product_url = first_item['url']
                         
-                        try:
-                            # Navigate to the product page
-                            sb.open(product_url)
-                            print("✅ Product page loaded successfully")
+                        if product_url and product_url != "URL not available":
+                            print(f"\n🌐 Opening product page: {product_url}")
+                            print(f"⏳ Opening product page for: {first_item['name']}")
                             
-                            # Try to click the Add to Cart button
-                            print("🔍 Looking for Add to Cart button...")
-                            
-                            # Try different selectors for the Add to Cart button
-                            add_to_cart_selectors = [
-                                "button.addToCartButton_3HRhU",
-                                "button.addToCartButton",
-                                "button[data-automation='addToCartButton']",
-                                "button:contains('Add to Cart')"
-                            ]
-                            
-                            add_to_cart_button = None
-                            for selector in add_to_cart_selectors:
-                                try:
-                                    add_to_cart_button = sb.find_element(selector, timeout=2)
-                                    if add_to_cart_button:
-                                        print(f"✅ Found Add to Cart button with selector: {selector}")
-                                        break
-                                except:
-                                    continue
-                            
-                            if add_to_cart_button:
-                                print("👆 Clicking 'Add to Cart' button...")
-                                add_to_cart_button.click()
-                                print("✅ Add to Cart button clicked! Item added to cart.")
+                            try:
+                                # Navigate to the product page
+                                sb.open(product_url)
+                                print("✅ Product page loaded successfully")
                                 
-                                # Wait for cart to update - increased to 2 seconds
-                                print("⏳ Waiting for cart to update (2 seconds)...")
-                                sb.sleep(2)
+                                # Try to click the Add to Cart button
+                                print("🔍 Looking for Add to Cart button...")
                                 
-                                # Navigate directly to checkout page instead of cart page
-                                print(f"🛒 Navigating directly to checkout page...")
-                                sb.open("https://www.bestbuy.ca/checkout/?qit=1#/en-ca/review")
-                                print("✅ Checkout page loaded successfully")
-
-                                # Wait for checkout page to load completely
-                                print("⏳ Waiting for checkout page elements to load...")
-                                sb.sleep(3)
-
-                                # Initialize variables for retry logic
-                                max_retries = 3
-                                retry_count = 0
-                                checkout_elements_found = False
-
-                                # Try to find checkout elements with retry logic
-                                while retry_count < max_retries and not checkout_elements_found:
+                                # Try different selectors for the Add to Cart button
+                                add_to_cart_selectors = [
+                                    "button.addToCartButton_3HRhU",
+                                    "button.addToCartButton",
+                                    "button[data-automation='addToCartButton']",
+                                    "button:contains('Add to Cart')"
+                                ]
+                                
+                                add_to_cart_button = None
+                                for selector in add_to_cart_selectors:
                                     try:
-                                        print(f"🔍 Looking for CVV field (Attempt {retry_count + 1}/{max_retries})...")
-                                        cvv_field = sb.find_element('input#cvv[name="cvv"]')
-                                        
-                                        if cvv_field:
-                                            print("✅ Found CVV field, entering value...")
-                                            cvv_field.send_keys("1234")
-                                            print("💳 CVV entered successfully!")
-                                            
-                                            # Look for Place Order button
-                                            try:
-                                                print("🔍 Looking for Place Order button...")
-                                                place_order_button = sb.find_element('button.style-module_button__ucc8a.style-module_primary__UIjVC.order-now')
-                                                
-                                                if place_order_button:
-                                                    print("✅ Place order button successfully located!")
-                                                    checkout_elements_found = True
-                                                    # Note: We're not clicking the button, just confirming we found it
-                                                else:
-                                                    print("❌ Place Order button not found")
-                                            except Exception as e:
-                                                print(f"❌ Error finding Place Order button: {e}")
-                                            # Will retry if retry_count < max_retries
-                                        else:
-                                            print("❌ CVV field not found")
-                                        # Will retry if retry_count < max_retries
-                                    except Exception as e:
-                                        print(f"❌ Error finding or entering CVV: {e}")
-                                        # Will retry if retry_count < max_retries
-                                    
-                                    # If elements not found and we haven't reached max retries, refresh and try again
-                                    if not checkout_elements_found and retry_count < max_retries - 1:
-                                        retry_count += 1
-                                        print(f"⏳ Sleeping 3 seconds before refreshing page (Attempt {retry_count + 1}/{max_retries})...")
-                                        sb.sleep(3)
-                                        print("🔄 Refreshing checkout page...")
-                                        sb.refresh()
-                                        sb.sleep(3)  # Wait for page to reload
-                                    else:
-                                        # Either we found the elements or reached max retries
-                                        break
-
-                                if checkout_elements_found:
-                                    print("✅ All checkout elements found successfully!")
-                                else:
-                                    print("⚠️ Could not find all checkout elements after maximum retries")
-
-                                # Pause the script until user decides to continue
-                                print("\n" + "=" * 80)
-                                print("⏸️  SCRIPT PAUSED - IN-STOCK ITEM FOUND!")
-                                print("=" * 80)
-                                print(f"Product: {first_item['name']}")
-                                print(f"Price: {first_item['price']}")
-                                print(f"URL: {product_url}")
-                                print("\nThe browser is now showing the checkout page.")
-                                input("Press Enter to continue monitoring or Ctrl+C to exit...")
+                                        add_to_cart_button = sb.find_element(selector, timeout=2)
+                                        if add_to_cart_button:
+                                            print(f"✅ Found Add to Cart button with selector: {selector}")
+                                            break
+                                    except:
+                                        continue
                                 
-                                # Return to search page after user continues
-                                print("\n🔄 Returning to search page...")
+                                if add_to_cart_button:
+                                    print("👆 Clicking 'Add to Cart' button...")
+                                    add_to_cart_button.click()
+                                    print("✅ Add to Cart button clicked! Item added to cart.")
+                                    
+                                    # Wait for cart to update - increased to 2 seconds
+                                    print("⏳ Waiting for cart to update (2 seconds)...")
+                                    sb.sleep(2)
+                                    
+                                    # Navigate directly to checkout page instead of cart page
+                                    print(f"🛒 Navigating directly to checkout page...")
+                                    sb.open("https://www.bestbuy.ca/checkout/?qit=1#/en-ca/review")
+                                    print("✅ Checkout page loaded successfully")
+
+                                    # Wait for checkout page to load completely
+                                    print("⏳ Waiting for checkout page elements to load...")
+                                    sb.sleep(3)
+
+                                    # Initialize variables for retry logic
+                                    max_retries = 3
+                                    retry_count = 0
+                                    checkout_elements_found = False
+
+                                    # Try to find checkout elements with retry logic
+                                    while retry_count < max_retries and not checkout_elements_found:
+                                        try:
+                                            print(f"🔍 Looking for CVV field (Attempt {retry_count + 1}/{max_retries})...")
+                                            cvv_field = sb.find_element('input#cvv[name="cvv"]')
+                                            
+                                            if cvv_field:
+                                                print("✅ Found CVV field, entering value...")
+                                                cvv_field.send_keys(BESTBUY_CVV)
+                                                print("💳 CVV entered successfully!")
+                                                
+                                                # Look for Place Order button
+                                                try:
+                                                    print("🔍 Looking for Place Order button...")
+                                                    place_order_button = sb.find_element('button.style-module_button__ucc8a.style-module_primary__UIjVC.order-now')
+                                                    
+                                                    if place_order_button:
+                                                        print("✅ Place order button successfully located!")
+                                                        
+                                                        # Only click the Place Order button if BESTBUY_PLACE_ORDER is True
+                                                        if BESTBUY_PLACE_ORDER:
+                                                            print(f"🛒 Clicking Place Order button... ⏰ Time: {get_timestamp()}")
+                                                            place_order_button.click()
+                                                            print("🎉 ORDER PLACED SUCCESSFULLY!")
+                                                            
+                                                            # Wait for confirmation page
+                                                            print("⏳ Waiting for confirmation page...")
+                                                            sb.sleep(3)
+                                                            
+                                                            # Take a screenshot of the confirmation page
+                                                            confirmation_screenshot = capture_screenshot(sb, "bestbuy_order_confirmation")
+                                                            
+                                                            # Send Discord notification with order confirmation
+                                                            confirmation_message = f"🎉 **ORDER PLACED SUCCESSFULLY!**\n\n**Product:** {first_item['name']}\n**Price:** {first_item['price']}\n**Time:** {get_timestamp()}\n\n💳 Payment processed!"
+                                                            if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
+                                                                send_discord_notification_with_file(confirmation_message, confirmation_screenshot, title="✅ BestBuy Order Confirmed!")
+                                                        else:
+                                                            print("⚠️ Order placement disabled - skipping final click")
+                                                        
+                                                        checkout_elements_found = True
+                                                    else:
+                                                        print("❌ Place Order button not found")
+                                                except Exception as e:
+                                                    print(f"❌ Error finding Place Order button: {e}")
+                                                # Will retry if retry_count < max_retries
+                                            else:
+                                                print("❌ CVV field not found")
+                                            # Will retry if retry_count < max_retries
+                                        except Exception as e:
+                                            print(f"❌ Error finding or entering CVV: {e}")
+                                            # Will retry if retry_count < max_retries
+                                        
+                                        # If elements not found and we haven't reached max retries, refresh and try again
+                                        if not checkout_elements_found and retry_count < max_retries - 1:
+                                            retry_count += 1
+                                            print(f"⏳ Sleeping 3 seconds before refreshing page (Attempt {retry_count + 1}/{max_retries})...")
+                                            sb.sleep(3)
+                                            print("🔄 Refreshing checkout page...")
+                                            sb.refresh()
+                                            sb.sleep(3)  # Wait for page to reload
+                                        else:
+                                            # Either we found the elements or reached max retries
+                                            break
+
+                                    if checkout_elements_found:
+                                        print("✅ All checkout elements found successfully!")
+                                    else:
+                                        print("⚠️ Could not find all checkout elements after maximum retries")
+
+                                    # Pause the script until user decides to continue
+                                    print("\n" + "=" * 80)
+                                    print("⏸️  SCRIPT PAUSED - IN-STOCK ITEM FOUND!")
+                                    print("=" * 80)
+                                    print(f"Product: {first_item['name']}")
+                                    print(f"Price: {first_item['price']}")
+                                    print(f"URL: {product_url}")
+                                    print("\nThe browser is now showing the checkout page.")
+                                    input("Press Enter to continue monitoring or Ctrl+C to exit...")
+                                    
+                                    # Return to search page after user continues
+                                    print("\n🔄 Returning to search page...")
+                                    sb.open(BESTBUY_SEARCH_URL)
+                                    sb.sleep(2)
+                                    
+                            except Exception as e:
+                                print(f"❌ Error processing product page: {e}")
+                                # Return to search page if there was an error
                                 sb.open(BESTBUY_SEARCH_URL)
                                 sb.sleep(2)
-                                
-                        except Exception as e:
-                            print(f"❌ Error processing product page: {e}")
-                            # Return to search page if there was an error
-                            sb.open(BESTBUY_SEARCH_URL)
-                            sb.sleep(2)
-                    else:
-                        print("⚠️ Could not open product page: URL not available")
+                        else:
+                            print("⚠️ Could not open product page: URL not available")
             
             # Record scan end time
             scan_end_time = get_timestamp()
@@ -444,8 +559,8 @@ def scrape_bestbuy():
             print(f"\n===== Scan completed | Started: {scan_start_time} | Ended: {scan_end_time} | Duration: {scan_duration.total_seconds():.2f} seconds =====")
             print(f"📊 Refreshes until next CAPTCHA check: {refresh_count}/{next_session_refresh_count}")
             
-            # Random refresh interval between MIN_RANDOM_REFRESH and MAX_RANDOM_REFRESH seconds
-            refresh_time = random.uniform(MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH)
+            # Random refresh interval between BESTBUY_MIN_RANDOM_REFRESH and BESTBUY_MAX_RANDOM_REFRESH seconds
+            refresh_time = random.uniform(BESTBUY_MIN_RANDOM_REFRESH, BESTBUY_MAX_RANDOM_REFRESH)
             print(f"\n⏱️  Refreshing in {refresh_time:.2f} seconds...")
             time.sleep(refresh_time)
             print("\n" + "=" * 80)

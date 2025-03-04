@@ -10,13 +10,13 @@ import json
 
 # Import configuration settings
 from scraperconfig import (
-    COOKIE_FILE, PAGE_LOAD_WAIT, MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH,
-    MIN_REFRESH_COUNT, MAX_REFRESH_COUNT, NEWEGG_ORDERS_PAGE_URL, 
+    COOKIE_FILE, NEWEGG_PAGE_LOAD_WAIT, NEWEGG_MIN_RANDOM_REFRESH, NEWEGG_MAX_RANDOM_REFRESH,
+    NEWEGG_MIN_REFRESH_COUNT, NEWEGG_MAX_REFRESH_COUNT, NEWEGG_ORDERS_PAGE_URL, 
     NEWEGG_SEARCH_PAGE_URL, NEWEGG_SHOW_COMBO_PRODUCTS, NEWEGG_ATC,
     NEWEGG_PLACE_ORDER, NEWEGG_PASSWORD, NEWEGG_CVV, DISCORD_WEBHOOK_URL, 
     DISCORD_USER_ID, ENABLE_DISCORD_STOCK_NOTIFICATIONS, 
     ENABLE_DISCORD_STATUS_UPDATES, STATUS_UPDATE_INTERVAL, LOG_DIRECTORY,
-    HEADLESS_MODE
+    HEADLESS_MODE, NEWEGG_BROWSER_WIDTH, NEWEGG_BROWSER_HEIGHT
 )
 
 # Global variable to track if the status update thread should continue running
@@ -166,8 +166,9 @@ def scrape_newegg(url):
     Returns:
         list: List of product dictionaries containing name, price, and stock status
     """
-    # Start a new browser instance with headless mode setting from config
-    sb = sb_cdp.Chrome(url, headless=HEADLESS_MODE)
+    # Initialize the browser with the configured window size
+    with sb_cdp.Browser(uc=True, headless=HEADLESS_MODE) as sb:
+        sb.set_window_size(NEWEGG_BROWSER_WIDTH, NEWEGG_BROWSER_HEIGHT)
     
     # Load cookies if available
     if os.path.exists(COOKIE_FILE):
@@ -179,8 +180,8 @@ def scrape_newegg(url):
         print(f"⚠️ Cookie file not found at {COOKIE_FILE}")
 
     # Wait for page load
-    print(f"⏳ Waiting {PAGE_LOAD_WAIT} seconds for page to load...")
-    sb.sleep(PAGE_LOAD_WAIT)
+    print(f"⏳ Waiting {NEWEGG_PAGE_LOAD_WAIT} seconds for page to load...")
+    sb.sleep(NEWEGG_PAGE_LOAD_WAIT)
 
     # Select product names and prices
     print("Finding product names and prices...")
@@ -690,7 +691,7 @@ if __name__ == "__main__":
         # Track refresh count for session refresh
         refresh_count = 0
         # Calculate next refresh count (random between MIN and MAX)
-        next_session_refresh_count = random.randint(MIN_REFRESH_COUNT, MAX_REFRESH_COUNT)
+        next_session_refresh_count = random.randint(NEWEGG_MIN_REFRESH_COUNT, NEWEGG_MAX_REFRESH_COUNT)
         print(f"⏰ Session will refresh after {next_session_refresh_count} page refreshes")
         
         # Continuous monitoring with random refresh interval
@@ -700,7 +701,7 @@ if __name__ == "__main__":
                 if refresh_count >= next_session_refresh_count:
                     refresh_session(sb)
                     refresh_count = 0  # Reset the counter
-                    next_session_refresh_count = random.randint(MIN_REFRESH_COUNT, MAX_REFRESH_COUNT)
+                    next_session_refresh_count = random.randint(NEWEGG_MIN_REFRESH_COUNT, NEWEGG_MAX_REFRESH_COUNT)
                     print(f"⏰ Next session refresh after {next_session_refresh_count} page refreshes")
                     
                     # Return to the product page after refreshing session
@@ -709,8 +710,8 @@ if __name__ == "__main__":
                     sb.sleep(1)
                 
                 # Wait for page load
-                print(f"⏳ Waiting {PAGE_LOAD_WAIT} seconds for page to load...")
-                sb.sleep(PAGE_LOAD_WAIT)
+                print(f"⏳ Waiting {NEWEGG_PAGE_LOAD_WAIT} seconds for page to load...")
+                sb.sleep(NEWEGG_PAGE_LOAD_WAIT)
                 
                 # Select product names and prices
                 print("Finding product names and prices...")
@@ -961,7 +962,7 @@ if __name__ == "__main__":
                             sb.open(url)
                 
                 # Random refresh interval between MIN_RANDOM_REFRESH and MAX_RANDOM_REFRESH seconds
-                refresh_time = random.uniform(MIN_RANDOM_REFRESH, MAX_RANDOM_REFRESH)
+                refresh_time = random.uniform(NEWEGG_MIN_RANDOM_REFRESH, NEWEGG_MAX_RANDOM_REFRESH)
                 print(f"\n⏱️  Refreshing in {refresh_time:.2f} seconds...")
                 time.sleep(refresh_time)
                 print("\n" + "=" * 80)
