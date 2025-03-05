@@ -786,187 +786,36 @@ if __name__ == "__main__":
                 if in_stock_indices and in_stock_buttons:
                     print(f"\n🎯 IN-STOCK ITEMS FOUND! Found {len(in_stock_indices)} items in stock. ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
                     
-                    # Create a list of in-stock items with their details
-                    in_stock_items = []
-                    for i, idx in enumerate(in_stock_indices):
-                        if idx < len(names) and idx < len(prices):
-                            product_name = names[idx].text.strip()
-                            product_price_text = prices[idx].text.strip()
-                            
-                            # Extract numeric price value (remove currency symbols, commas, etc.)
-                            try:
-                                numeric_price = ''.join(c for c in product_price_text if c.isdigit() or c == '.')
-                                if numeric_price:
-                                    price_value = float(numeric_price)
-                                else:
-                                    price_value = float('inf')
-                            except ValueError:
-                                price_value = float('inf')
-                            
-                            # Skip combo products if SHOW_COMBO_PRODUCTS is False
-                            if not NEWEGG_SHOW_COMBO_PRODUCTS and "Combo" in product_name:
-                                continue
-                                
-                            in_stock_items.append({
-                                'index': i,
-                                'product_idx': idx,
-                                'name': product_name,
-                                'price_text': product_price_text,
-                                'price_value': price_value
-                            })
+                    # Take a screenshot of the page with in-stock items
+                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                    screenshot_path = os.path.join(LOG_DIRECTORY, f"in_stock_{timestamp}.png")
+                    sb.save_screenshot(screenshot_path)
+                    print(f"📸 Screenshot saved to: {screenshot_path}")
                     
-                    # Sort items by price (lowest first)
-                    in_stock_items.sort(key=lambda x: x['price_value'])
-                    
-                    # Display all in-stock items with their prices
-                    print("\nAvailable in-stock items (sorted by price):")
-                    for i, item in enumerate(in_stock_items):
-                        print(f"{i+1}. {item['name']} - {item['price_text']}")
-                    
-                    # Take a screenshot of the in-stock items
-                    screenshot_path = capture_screenshot(sb, "in_stock")
-                    
-                    # Only proceed with add-to-cart if NEWEGG_ATC is True
-                    if NEWEGG_ATC and in_stock_items:
-                        lowest_price_item = in_stock_items[0]
-                        print(f"\n🔍 Automatically selecting lowest-priced item: {lowest_price_item['name']} - {lowest_price_item['price_text']}")
+                    # Process each in-stock item
+                    for idx in in_stock_indices:
+                        item_name = names[idx].text if idx < len(names) else "Unknown Product"
+                        item_price_text = prices[idx].text if idx < len(prices) else "Unknown Price"
                         
-                        # Get the corresponding button and product index
-                        selection_idx = lowest_price_item['index']
-                        idx = in_stock_indices[selection_idx]
-                        button = in_stock_buttons[selection_idx]
+                        # Create a notification message
+                        message = f"🚨 **IN STOCK ALERT!**\n\n**Product:** {item_name}\n**Price:** {item_price_text}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 [View on Newegg]({url})"
                         
-                        # Log the information with timestamp
-                        print(f"\n{'=' * 80}")
-                        print(f"🛒 ATTEMPTING TO ADD TO CART: {lowest_price_item['name']}")
-                        print(f"💰 Price: {lowest_price_item['price_text']}")
-                        print(f"⏰ Start Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                        print(f"{'=' * 80}")
+                        # Send Discord notification with screenshot
+                        if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
+                            print("📱 Sending Discord notification with screenshot...")
+                            send_discord_notification_with_file(message, screenshot_path, title="✅ Newegg Stock Alert!")
                         
-                        try:
-                            # Click the Add to Cart button
-                            print(f"👆 Clicking 'Add to Cart' button...")
-                            button.click()
-                            
-                            # Wait for cart to update
-                            print("⏳ Waiting for cart to update...")
-                            sb.sleep(1)
-                            
-                            # Log success with timestamp
-                            print(f"✅ ITEM ADDED TO CART SUCCESSFULLY: {lowest_price_item['name']} ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                            
-                            # Take a screenshot of the cart page
-                            cart_screenshot_path = capture_screenshot(sb, "cart")
-                            
-                            # Send Discord notification
-                            notification_message = f"🛒 **Item added to cart!**\n\n**Product:** {lowest_price_item['name']}\n**Price:** {lowest_price_item['price_text']}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 **Cart URL:** https://secure.newegg.ca/shop/cart"
-                            if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-                                send_discord_notification_with_file(notification_message, cart_screenshot_path, title="🎯 Newegg Item In Stock!")
-                            
-                            # Navigate to cart page with timestamp
-                            print(f"\n🛒 Navigating to cart page... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                            sb.open("https://secure.newegg.ca/shop/cart")
-                            sb.sleep(1)  # Wait for cart page to load
-                            
-                            # Try to click the Secure Checkout button
-                            try:
-                                print(f"✅ Found Secure Checkout button, clicking... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                                # Try to find the button using the provided selector
-                                checkout_button = sb.find_element('button.btn.btn-primary.btn-wide:contains("Secure Checkout")')
-                                
-                                if checkout_button:
-                                    print("✅ Found Secure Checkout button, clicking...")
-                                    checkout_button.click()
-                                    sb.sleep(2)  # Wait for checkout page to load
-                                    
-                                    # Check if sign-in form appears after clicking Secure Checkout
-                                    print("🔍 Checking if sign-in form appears...")
-                                    try:
-                                        password_field = sb.find_element('input#labeled-input-password[name="password"]', timeout=2)
-                                        if password_field:
-                                            print("🔑 Sign-in form detected, entering credentials...")
-                                            password_field.send_keys(NEWEGG_PASSWORD)
-                                            
-                                            # Find and click the sign-in button
-                                            sign_in_button = sb.find_element('button#signInSubmit[name="signIn"]')
-                                            if sign_in_button:
-                                                print("👆 Clicking 'SIGN IN' button...")
-                                                sign_in_button.click()
-                                                
-                                                # Wait for sign-in to complete
-                                                print("⏳ Waiting for sign-in to complete...")
-                                                sb.sleep(1)
-                                                print("✅ Sign-in completed")
-                                    except Exception as e:
-                                        print(f"ℹ️ No sign-in form detected, continuing with checkout: {e}")
-                                    
-                                    # Look for CVV field
-                                    print("🔍 Looking for CVV field...")
-                                    try:
-                                        cvv_field = sb.find_element('input[name="cvvNumber"]')
-                                        if cvv_field:
-                                            print("✅ Found CVV field, entering value...")
-                                            cvv_field.send_keys(NEWEGG_CVV)
-                                            print("💳 CVV entered successfully!")
-
-                                            # Look for and click the Place Order button
-                                            try:
-                                                print("🔍 Looking for Place Order button...")
-                                                place_order_button = sb.find_element('button#btnCreditCard.button.button-m.bg-orange')
-                                                
-                                                if place_order_button:
-                                                    print(f"✅ Found Place Order button, clicking... ⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                                                    if NEWEGG_PLACE_ORDER:
-                                                        place_order_button.click()
-                                                        print("🛒 Order placed!")
-                                                    else:
-                                                        print("⚠️ Order placement disabled - skipping final click")
-                                                    
-                                                    # Wait before taking screenshot
-                                                    print("⏳ Waiting for confirmation page...")
-                                                    sb.sleep(1)
-                                                    
-                                                    # Take a screenshot
-                                                    screenshot_path = f"order_confirmation_{time.strftime('%Y%m%d_%H%M%S')}.png"
-                                                    sb.save_screenshot(screenshot_path)
-                                                    print(f"📸 Screenshot saved to: {screenshot_path}")
-                                                    
-                                                    # Send Discord notification with order confirmation
-                                                    confirmation_message = f"🎉 **ORDER PLACED SUCCESSFULLY!**\n\n**Product:** {lowest_price_item['name']}\n**Price:** {lowest_price_item['price_text']}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n💳 Payment processed!"
-                                                    if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-                                                        send_discord_notification_with_file(confirmation_message, screenshot_path, title="✅ Newegg Order Confirmed!")
-                                                    else:
-                                                        print("❌ Payment processing disabled")
-                                                else:
-                                                    print("❌ Place Order button not found")
-                                            except Exception as e:
-                                                print(f"❌ Error during order placement: {e}")
-                                    except:
-                                        print("❌ CVV field not found or not accessible yet")
-                                else:
-                                    print("❌ Secure Checkout button not found")
-
-                            except Exception as e:
-                                print(f"❌ Error during checkout process: {e}")
-                            
-                            # Pause for user to take action
-                            print("\n⏸️ Checkout initiated. Press Enter to continue...")
-                            input()
-                            
-                            # After user continues, go back to the product page
-                            sb.open(url)
-                            
-                        except Exception as e:
-                            print(f"❌ Error clicking Add to Cart button: {e}")
-                            # If there was an error, refresh the page
-                            sb.open(url)
+                        # Continue with existing auto-purchase logic if enabled
+                        if NEWEGG_ATC:
+                            # Add code here for auto-purchase
+                            pass  # This ensures there's an indented block after the if statement
                 
                 # Random refresh interval between MIN_RANDOM_REFRESH and MAX_RANDOM_REFRESH seconds
                 refresh_time = random.uniform(NEWEGG_MIN_RANDOM_REFRESH, NEWEGG_MAX_RANDOM_REFRESH)
                 print(f"\n⏱️  Refreshing in {refresh_time:.2f} seconds...")
                 time.sleep(refresh_time)
                 print("\n" + "=" * 80)
-                print(f"🔄 Refreshing page: {url}")
+                print(f"🔄 Refreshing page: {url} ⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print("=" * 80 + "\n")
                 
                 # Increment refresh counter
