@@ -12,12 +12,9 @@ import queue  # For thread-safe communication between threads
 # Import configuration settings from scraperconfig.py if available, otherwise use defaults
 try:
     from scraperconfig import (
-        # Discord notification settings
-        DISCORD_WEBHOOK_URL, DISCORD_USER_ID, 
-        ENABLE_DISCORD_STOCK_NOTIFICATIONS, ENABLE_DISCORD_STATUS_UPDATES,
-        STATUS_UPDATE_INTERVAL, LOG_DIRECTORY,
         # Proxy configuration
-        USE_PROXY, ROTATE_PROXIES, PROXY_LIST
+        USE_PROXY, ROTATE_PROXIES, PROXY_LIST,
+        LOG_DIRECTORY
     )
     
     # Try to import optional proxy settings
@@ -33,47 +30,13 @@ try:
         PROXY_PASSWORD = ""
     
     print("✅ Successfully loaded configuration from scraperconfig.py")
-    
-    # Print proxy status with more details
-    if USE_PROXY:
-        if ROTATE_PROXIES and PROXY_LIST:
-            print(f"✅ Proxy status: Enabled, Rotation: Enabled ({len(PROXY_LIST)} proxies available)")
-        else:
-            # Mask password in displayed URL for security
-            masked_url = PROXY_URL
-            if PROXY_URL and '@' in PROXY_URL:
-                parts = PROXY_URL.split('@')
-                auth_parts = parts[0].split('://')
-                if len(auth_parts) > 1:
-                    protocol = auth_parts[0]
-                    auth = auth_parts[1].split(':')
-                    if len(auth) > 1:
-                        username = auth[0]
-                        masked_url = f"{protocol}://{username}:****@{parts[1]}"
-            
-            print(f"✅ Proxy status: Enabled, Rotation: Disabled")
-            print(f"✅ Proxy URL: {masked_url}")
-    else:
-        print("✅ Proxy status: Disabled")
-        
-    if USE_PROXY and ROTATE_PROXIES and PROXY_LIST:
+    print(f"✅ Proxy status: {'Enabled' if USE_PROXY else 'Disabled'}, Rotation: {'Enabled' if ROTATE_PROXIES else 'Disabled'}")
+    if USE_PROXY and ROTATE_PROXIES:
         print(f"✅ Using {len(PROXY_LIST)} rotating proxies")
 except ImportError:
     print("⚠️ Could not import scraperconfig.py, using default settings")
     # Default configuration
-    DISCORD_WEBHOOK_URL = ""
-    DISCORD_USER_ID = ""
-    ENABLE_DISCORD_STOCK_NOTIFICATIONS = True
-    ENABLE_DISCORD_STATUS_UPDATES = True
-    STATUS_UPDATE_INTERVAL = 300  # 5 minutes
     LOG_DIRECTORY = "logs"
-    # Default proxy configuration
-    USE_PROXY = False
-    PROXY_URL = ""  # Format: "http://ip:port" or "http://username:password@ip:port"
-    PROXY_USERNAME = ""
-    PROXY_PASSWORD = ""
-    ROTATE_PROXIES = False
-    PROXY_LIST = []  # List of proxy URLs to rotate through
 
 # Create logs directory if it doesn't exist
 if not os.path.exists(LOG_DIRECTORY):
@@ -144,49 +107,9 @@ def format_time_elapsed(start_time):
     
     return ", ".join(time_parts)
 
-def send_discord_notification(message, title=None, color=5814783):
-    """
-    Sends a notification to Discord using a webhook.
-    
-    Args:
-        message (str): The message to send
-        title (str, optional): The title of the embed
-        color (int, optional): The color of the embed
-    """
-    if not DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL == "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN":
-        print("⚠️ Discord webhook URL not configured. Notification not sent.")
-        return
-    
-    # Create the payload
-    payload = {
-        "content": f"<@{DISCORD_USER_ID}>" if DISCORD_USER_ID else "",
-        "embeds": [
-            {
-                "title": title if title else "BestBuy API Monitor Notification",
-                "description": message,
-                "color": color,
-                "footer": {
-                    "text": f"BestBuy API Monitor • {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                }
-            }
-        ]
-    }
-    
-    # Send the request
-    try:
-        response = requests.post(
-            DISCORD_WEBHOOK_URL,
-            data=json.dumps(payload),
-            headers={"Content-Type": "application/json"}
-        )
-        response.raise_for_status()
-        print(f"✅ Discord notification sent successfully")
-    except Exception as e:
-        print(f"❌ Error sending Discord notification: {e}")
-
 def send_status_update():
     """
-    Send a status update to Discord with the elapsed runtime and refresh count.
+    Print a status update with the elapsed runtime and refresh count.
     """
     global refresh_count
     elapsed_time = format_time_elapsed(start_time)
@@ -206,13 +129,9 @@ def send_status_update():
             api_details.append(f"• API #{list(refresh_count.keys()).index(api_url) + 1}: {count} checks")
     
     api_status = "\n".join(api_details)
-    message = f"🕒 **Status Update**\n\n• Monitoring has been running for {elapsed_time}\n• Total API checks: {total_refresh_count}\n\n**API Details:**\n{api_status}"
-    
-    # Only send Discord notification if enabled
-    if ENABLE_DISCORD_STATUS_UPDATES:
-        send_discord_notification(message, title="BestBuy API Monitor Status", color=3447003)  # Blue color
     
     print(f"\n📊 Status update: Running for {elapsed_time}, total API checks: {total_refresh_count}")
+    print(f"API Details:\n{api_status}")
 
 def status_update_thread():
     """
@@ -223,9 +142,12 @@ def status_update_thread():
     # Send initial status update
     send_status_update()
     
+    # Status update every 5 minutes
+    status_update_interval = 300
+    
     while status_update_running:
         # Sleep for the specified interval
-        for _ in range(STATUS_UPDATE_INTERVAL):
+        for _ in range(status_update_interval):
             if not status_update_running:
                 break
             time.sleep(1)
@@ -488,29 +410,6 @@ def check_bestbuy_availability(api_url, api_index):
                 
                 # Update the last open time for this SKU
                 browser_open_times[sku] = current_time
-                
-                # Send a Discord notification about the browser opening
-                if ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-                    browser_message = f"🌐 **Browser Window Opened**\n\n**Product:** {product['name']}\n**SKU:** {product['sku']}\n**Status:** {product['status_text']}\n**API:** #{api_index}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n🔗 [View on BestBuy](https://www.bestbuy.ca/en-ca/product/{sku})"
-                    send_discord_notification(browser_message, title="🌐 Browser Window Opened", color=16753920)  # Orange color
-        
-        # Send notifications for newly available products
-        if newly_available_skus and ENABLE_DISCORD_STOCK_NOTIFICATIONS:
-            for product in available_products:
-                if product['sku'] in newly_available_skus:
-                    # Create notification message
-                    message = f"🚨 **IN STOCK ALERT!**\n\n**Product:** {product['name']}\n**SKU:** {product['sku']}\n**Status:** {product['status_text']}\n**API:** #{api_index}\n**Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                    
-                    if product['available_locations']:
-                        message += f"\n\n**Available at:** {', '.join(product['available_locations'][:5])}"
-                        if len(product['available_locations']) > 5:
-                            message += f" and {len(product['available_locations']) - 5} more stores"
-                    
-                    message += f"\n\n🔗 [View on BestBuy](https://www.bestbuy.ca/en-ca/product/{product['sku']})"
-                    
-                    # Send Discord notification
-                    print(f"📱 Sending Discord notification for SKU {product['sku']}...")
-                    send_discord_notification(message, title="✅ BestBuy Stock Alert!", color=5814783)
         
         # Update previously available SKUs
         with api_lock:  # Use lock for thread safety
@@ -548,8 +447,8 @@ def api_monitor_thread(api_url, api_index):
         
         # Continuous monitoring with random refresh interval
         while status_update_running:  # Use global flag to control all threads
-            # Random refresh interval between 3.5 and 6 seconds
-            refresh_time = random.uniform(0.1,0.2)
+            # Random refresh interval between 1.5 and 3.75 seconds
+            refresh_time = random.uniform(1.5, 3.75)
             print(f"\n⏱️  API #{api_index} - Next check in {refresh_time:.2f} seconds...")
             time.sleep(refresh_time)
             
@@ -570,12 +469,12 @@ def main():
     # List of API URLs to monitor
     api_urls = [
         # Default API URL (original)
-        #"https://www.bestbuy.ca/ecomm-api/availability/products?accept=application%2Fvnd.bestbuy.simpleproduct.v1%2Bjson&accept-language=en-CA&locations=197%7C198%7C977%7C259%7C193%7C203%7C199%7C931%7C194%7C195%7C617%7C192%7C196%7C965%7C927%7C180%7C188%7C938%7C943%7C164%7C237%7C179%7C163%7C233%7C932%7C956%7C187%7C200%7C202%7C176%7C260%7C937%7C926%7C329%7C503%7C764%7C795%7C916%7C1016%7C319%7C544%7C910%7C161%7C954%7C207%7C175%7C930%7C223%7C622%7C160%7C181%7C245%7C925%7C985%7C990%7C959%7C178%7C182%7C949&postalCode=M5A&skus=18934175%7C19190987%7C18934178%7C19183868%7C18931348%7C18931347%7C18931631%7C18969272%7C18938759%7C19177947%7C18934180%7C18938760%7C19177946%7C19177950%7C18931397%7C19183867%7C19183866%7C18931629%7C18934179%7C18931632%7C19186504%7C18971064%7C18938752%7C18938751",
+        "https://www.bestbuy.ca/ecomm-api/availability/products?accept=application%2Fvnd.bestbuy.simpleproduct.v1%2Bjson&accept-language=en-CA&locations=197%7C198%7C977%7C259%7C193%7C203%7C199%7C931%7C194%7C195%7C617%7C192%7C196%7C965%7C927%7C180%7C188%7C938%7C943%7C164%7C237%7C179%7C163%7C233%7C932%7C956%7C187%7C200%7C202%7C176%7C260%7C937%7C926%7C329%7C503%7C764%7C795%7C916%7C1016%7C319%7C544%7C910%7C161%7C954%7C207%7C175%7C930%7C223%7C622%7C160%7C181%7C245%7C925%7C985%7C990%7C959%7C178%7C182%7C949&postalCode=M5A&skus=18934175%7C19190987%7C18934178%7C19183868%7C18931348%7C18931347%7C18931631%7C18969272%7C18938759%7C19177947%7C18934180%7C18938760%7C19177946%7C19177950%7C18931397%7C19183867%7C19183866%7C18931629%7C18934179%7C18931632%7C19186504%7C18971064%7C18938752%7C18938751",
         #"https://www.bestbuy.ca/ecomm-api/availability/products?accept=application%2Fvnd.bestbuy.standardproduct.v1%2Bjson&accept-language=en-CA&locations=172%7C936%7C246%7C174%7C980%7C173&postalCode=N0L&skus=17864951 tester
         #"https://www.bestbuy.ca/ecomm-api/availability/products?accept=application%2Fvnd.bestbuy.simpleproduct.v1%2Bjson&accept-language=en-CA&locations=172%7C936%7C246%7C173%7C174%7C980&postalCode=N5P&skus=18934175%7C19190987%7C18934178%7C18931348%7C18931347%7C18931631%7C18969272%7C18938759%7C19177947%7C18938760%7C18931397%7C18931629%7C18931632%7C19177946%7C18971064%7C18938752%7C18938751%7C18938753%7C18938754%7C18938755%7C18938757%7C18934247%7C18934177%7C18938756", all
-        #"https://www.bestbuy.ca/ecomm-api/availability/products?accept=application%2Fvnd.bestbuy.standardproduct.v1%2Bjson&accept-language=en-CA&locations=172%7C936%7C246%7C173%7C174%7C980&postalCode=N5P&skus=19177950",
+        
         # New API URL (additional)
-        "https://www.bestbuy.ca/ecomm-api/availability/products?accept=application%2Fvnd.bestbuy.standardproduct.v1%2Bjson&accept-language=en-CA&locations=172%7C936%7C246%7C173%7C174%7C980&postalCode=N5P&skus=19177950"
+        "https://www.bestbuy.ca/ecomm-api/availability/products?accept=application%2Fvnd.bestbuy.simpleproduct.v1%2Bjson&accept-language=en-CA&locations=197%7C198%7C977%7C259%7C193%7C203%7C199%7C931%7C194%7C195%7C617%7C192%7C196%7C965%7C927%7C180%7C188%7C938%7C943%7C164%7C237%7C179%7C163%7C233%7C932%7C956%7C187%7C200%7C202%7C176%7C260%7C937%7C926%7C329%7C503%7C764%7C795%7C916%7C1016%7C319%7C544%7C910%7C161%7C954%7C207%7C175%7C930%7C223%7C622%7C160%7C181%7C245%7C925%7C985%7C990%7C959%7C178%7C182%7C949&postalCode=M5A&skus=19190988%7C18938758%7C18931628%7C18931627"
     ]
     
     # Get API URLs from command line if provided
@@ -630,9 +529,6 @@ def main():
         # Send final status update
         elapsed_time = format_time_elapsed(start_time)
         total_refresh_count = sum(refresh_count.values())
-        final_message = f"🛑 **Monitoring Ended**\n\n• Total runtime: {elapsed_time}\n• Total API checks: {total_refresh_count}"
-        if ENABLE_DISCORD_STATUS_UPDATES:
-            send_discord_notification(final_message, title="BestBuy API Monitor Stopped", color=15158332)  # Red color
         print(f"\n📊 Final status: Total runtime {elapsed_time}, total API checks: {total_refresh_count}")
         
         # Log termination time

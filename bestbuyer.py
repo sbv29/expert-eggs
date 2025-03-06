@@ -595,5 +595,13 @@ def scrape_bestbuy():
         except:
             pass
 
+    # Save complete output to file
+    output_file = f"logs/bestbuy_final_output_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    with open(output_file, 'w') as f:
+        f.write(f"🔄 Script terminated at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"📝 Saving complete output to: {output_file}\n")
+        f.write(f"📄 Final output saved to: {output_file}\n")
+        f.write(f"📄 Log file copied to: {output_file}\n")
+
 if __name__ == "__main__":
     scrape_bestbuy()
